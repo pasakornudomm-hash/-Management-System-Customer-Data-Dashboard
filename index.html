@@ -194,6 +194,15 @@
       background: #fff0f0;
     }
 
+    button:disabled {
+      cursor: wait;
+      opacity: .62;
+    }
+
+    [aria-busy="true"] {
+      cursor: progress;
+    }
+
     .panel {
       background: rgba(255, 255, 255, .9);
       border: 1px solid var(--line);
@@ -1376,6 +1385,11 @@
   </div>
 
   <script>
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbybY5j57KHPks8Grhm713wCc4f84pm9E9bPWehXHnT-mUf9TmRmM7uZ3FDQO98cDA/exec";
+    const API_TIMEOUT_MS = 45000;
+    const API_READ_CACHE_MS = 15000;
+    const SEARCH_DEBOUNCE_MS = 180;
+    const TABLE_RENDER_CHUNK_SIZE = 180;
     const storageKey = "blue-customer-records-v1";
     const managedNamesKey = "blue-customer-records-managed-names-v1";
     const adminNameMemoryKey = "blue-customer-records-admin-name-v1";
@@ -1501,26 +1515,77 @@
       }
     ];
 
-    let records = JSON.parse(localStorage.getItem(storageKey) || "null") || sampleRecords;
+    function loadCachedRecords() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(storageKey) || "null");
+        return Array.isArray(cached) ? cached : sampleRecords;
+      } catch (error) {
+        console.warn("อ่าน cache ข้อมูลเดิมไม่สำเร็จ", error);
+        return sampleRecords;
+      }
+    }
+
+    let records = loadCachedRecords();
     let managedNameOptions = {};
     try {
       managedNameOptions = JSON.parse(localStorage.getItem(managedNamesKey) || "{}") || {};
     } catch (error) {
       managedNameOptions = {};
     }
-    const isAppsScriptWebApp = Boolean(typeof google !== "undefined" && google.script && google.script.run);
-    let scriptUrl = isAppsScriptWebApp ? "embedded" : "";
+    const isEmbeddedAppsScript = Boolean(typeof google !== "undefined" && google.script && google.script.run);
+    const isRemoteAppsScript = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(GAS_WEB_APP_URL);
+    const isAppsScriptWebApp = isEmbeddedAppsScript || isRemoteAppsScript;
+    let scriptUrl = isEmbeddedAppsScript ? "embedded" : GAS_WEB_APP_URL;
     let reportMonth = localStorage.getItem(reportMonthKey) || "";
     let dashboardSummary = null;
     let historyRecords = [];
     let columnFilters = {};
     let activeFilterField = "";
     let activeFilterValues = [];
+    let cacheWriteHandle = 0;
+    let activeLoadPromise = null;
+    let isSubmittingRecord = false;
+    let tableRenderToken = 0;
+    let historyRenderToken = 0;
+    let duplicateLookupCache = null;
+    let searchTextCache = new WeakMap();
+    let apiCacheGeneration = 0;
+    const pendingApiRequests = new Map();
+    const apiResponseCache = new Map();
+    const pendingDeletes = new Set();
 
     const $ = (selector) => document.querySelector(selector);
 
     function saveRecords() {
-      localStorage.setItem(storageKey, JSON.stringify(records));
+      if (cacheWriteHandle) return;
+      const writeCache = () => {
+        cacheWriteHandle = 0;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(records));
+        } catch (error) {
+          console.warn("บันทึก cache ในเครื่องไม่สำเร็จ", error);
+        }
+      };
+
+      if ("requestIdleCallback" in window) {
+        cacheWriteHandle = window.requestIdleCallback(writeCache, { timeout: 1500 });
+      } else {
+        cacheWriteHandle = window.setTimeout(writeCache, 80);
+      }
+    }
+
+    function markRecordsChanged() {
+      duplicateLookupCache = null;
+      searchTextCache = new WeakMap();
+      saveRecords();
+    }
+
+    function debounce(callback, delay = SEARCH_DEBOUNCE_MS) {
+      let timer = 0;
+      return (...args) => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => callback(...args), delay);
+      };
     }
 
     function makeId() {
@@ -1709,49 +1774,191 @@
       $("#syncBtn").focus();
     }
 
-    async function sheetRequest(action, payload = {}) {
-      if (!isAppsScriptWebApp) {
-        throw new Error("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App");
+    function validateApiResult(result) {
+      if (!result || !result.ok) {
+        throw new Error((result && result.error) || "Google Sheet ส่งผลลัพธ์ไม่สำเร็จ");
       }
+      return result;
+    }
 
+    function embeddedSheetRequest(action, payload) {
       return new Promise((resolve, reject) => {
+        let settled = false;
+        const timeout = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          reject(new Error("Google Apps Script ตอบกลับช้าเกินเวลาที่กำหนด"));
+        }, API_TIMEOUT_MS);
+
         google.script.run
           .withSuccessHandler((result) => {
-            if (!result || !result.ok) {
-              reject(new Error((result && result.error) || "Google Sheet ส่งผลลัพธ์ไม่สำเร็จ"));
-              return;
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            try {
+              resolve(validateApiResult(result));
+            } catch (error) {
+              reject(error);
             }
-            resolve(result);
           })
           .withFailureHandler((error) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
             reject(new Error((error && error.message) || String(error || "เชื่อมต่อ Google Apps Script ไม่สำเร็จ")));
           })
           .api(action, payload);
       });
     }
 
+    async function remoteSheetRequest(action, payload) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          mode: "cors",
+          redirect: "follow",
+          cache: "no-store",
+          credentials: "omit",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({ action, ...payload }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Google Apps Script ตอบกลับ HTTP ${response.status}`);
+        }
+
+        const text = await response.text();
+        let result;
+        try {
+          result = JSON.parse(text);
+        } catch (error) {
+          throw new Error("Google Apps Script ส่งข้อมูลกลับมาไม่ใช่ JSON");
+        }
+        return validateApiResult(result);
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          throw new Error("หมดเวลารอ Google Apps Script กรุณาลองใหม่");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+
+    function isRetryableApiError(error) {
+      const message = String((error && error.message) || error || "").toLowerCase();
+      return message.includes("fetch") || message.includes("network") || message.includes("http 5") || message.includes("หมดเวลา") || message.includes("ช้าเกินเวลา");
+    }
+
+    async function requestWithRetry(action, payload, canRetry) {
+      const attempts = canRetry ? 2 : 1;
+      let lastError;
+
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          return isEmbeddedAppsScript
+            ? await embeddedSheetRequest(action, payload)
+            : await remoteSheetRequest(action, payload);
+        } catch (error) {
+          lastError = error;
+          if (attempt + 1 >= attempts || !isRetryableApiError(error)) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 450));
+        }
+      }
+      throw lastError;
+    }
+
+    function invalidateApiCache() {
+      apiCacheGeneration += 1;
+      apiResponseCache.clear();
+    }
+
+    async function sheetRequest(action, payload = {}, options = {}) {
+      if (!isAppsScriptWebApp) {
+        throw new Error("ยังไม่ได้ตั้งค่า Google Apps Script Web App");
+      }
+
+      const isReadAction = action === "list" || action === "history";
+      const cacheKey = isReadAction ? `${action}:${JSON.stringify(payload)}` : "";
+      const cached = isReadAction ? apiResponseCache.get(cacheKey) : null;
+      if (!options.force && cached && Date.now() - cached.timestamp < API_READ_CACHE_MS) {
+        return cached.result;
+      }
+      if (isReadAction && pendingApiRequests.has(cacheKey)) {
+        return pendingApiRequests.get(cacheKey);
+      }
+
+      const requestGeneration = apiCacheGeneration;
+      const request = requestWithRetry(action, payload, isReadAction)
+        .then((result) => {
+          if (isReadAction && requestGeneration === apiCacheGeneration) {
+            apiResponseCache.set(cacheKey, { timestamp: Date.now(), result });
+          }
+          if (!isReadAction) invalidateApiCache();
+          return result;
+        })
+        .finally(() => {
+          if (isReadAction && pendingApiRequests.get(cacheKey) === request) {
+            pendingApiRequests.delete(cacheKey);
+          }
+        });
+
+      if (isReadAction) pendingApiRequests.set(cacheKey, request);
+      return request;
+    }
+
+    function setDataLoading(isLoading) {
+      const main = document.querySelector("main");
+      if (main) main.setAttribute("aria-busy", String(isLoading));
+      ["refreshDataBtn", "saveUrlBtn", "syncBtn"].forEach((id) => {
+        const button = document.getElementById(id);
+        if (button) button.disabled = isLoading;
+      });
+    }
+
     async function loadFromSheet() {
+      if (activeLoadPromise) return activeLoadPromise;
       if (!isAppsScriptWebApp) {
         setStatus("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App เพื่อเชื่อม Google Sheet", true);
         return;
       }
+
+      setDataLoading(true);
       setStatus("กำลังโหลดข้อมูลจาก Google Sheet...");
-      try {
-        const result = await sheetRequest("list");
-        records = Array.isArray(result.records) ? result.records : [];
-        dashboardSummary = null;
+      activeLoadPromise = (async () => {
         try {
-          const historyResult = await sheetRequest("history");
-          historyRecords = Array.isArray(historyResult.history) ? historyResult.history : [];
-        } catch (historyError) {
-          historyRecords = [];
-          console.warn(historyError);
+          const [listResult, historyResult] = await Promise.allSettled([
+            sheetRequest("list", {}, { force: true }),
+            sheetRequest("history", {}, { force: true })
+          ]);
+
+          if (listResult.status === "rejected") throw listResult.reason;
+          records = Array.isArray(listResult.value.records) ? listResult.value.records : [];
+          if (historyResult.status === "fulfilled") {
+            historyRecords = Array.isArray(historyResult.value.history) ? historyResult.value.history : [];
+          } else {
+            console.warn(historyResult.reason);
+          }
+          dashboardSummary = null;
+          markRecordsChanged();
+          renderAll({ persist: false });
+          const historyNote = historyResult.status === "rejected" ? " (ประวัติจะโหลดใหม่เมื่อเปิดหน้า)" : "";
+          setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ${historyNote}`);
+        } catch (error) {
+          setStatus(`เชื่อมต่อไม่สำเร็จ: ${error.message}`, true);
+        } finally {
+          setDataLoading(false);
+          activeLoadPromise = null;
         }
-        renderAll();
-        setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ`);
-      } catch (error) {
-        setStatus(`เชื่อมต่อไม่สำเร็จ: ${error.message}`, true);
-      }
+      })();
+
+      return activeLoadPromise;
     }
 
     function switchView(target) {
@@ -1852,6 +2059,11 @@
       ]));
     }
 
+    function getDuplicateLookup() {
+      if (!duplicateLookupCache) duplicateLookupCache = buildDuplicateLookup(records);
+      return duplicateLookupCache;
+    }
+
     function isDuplicateRecordValue(record, field, duplicateLookup) {
       const value = normalizedDuplicateValue(field, record[field]);
       return Boolean(value) && duplicateLookup[field]?.has(value);
@@ -1877,7 +2089,7 @@
       const province = $("#provinceFilter").value.trim().toLowerCase();
 
       return records.filter((record) => {
-        const text = fields.map((field) => record[field] || "").join(" ").toLowerCase();
+        const text = recordText(record).toLowerCase();
         const matchKeyword = !keyword || text.includes(keyword);
         const matchSalesOrg = !salesOrg || record.salesOrg === salesOrg;
         const matchCallVer = !callVer || record.callVer === callVer;
@@ -2370,7 +2582,11 @@
     }
 
     function recordText(record) {
-      return fields.map((field) => record[field] || "").join(" ");
+      if (!record || typeof record !== "object") return "";
+      if (!searchTextCache.has(record)) {
+        searchTextCache.set(record, fields.map((field) => record[field] || "").join(" "));
+      }
+      return searchTextCache.get(record);
     }
 
     function recordContains(record, text) {
@@ -2430,17 +2646,13 @@
       renderRegionMap(sourceRecords);
     }
 
-    function renderTable() {
-      const rows = filteredRecords();
-      const duplicateLookup = buildDuplicateLookup(records);
-      $("#emptyState").hidden = rows.length > 0;
-      renderColumnFilterButtons();
-      $("#recordsBody").innerHTML = rows.map((record) => `
+    function recordRowHtml(record, duplicateLookup) {
+      return `
         <tr>
           <td>
             <div class="row-actions">
-              <button class="icon-btn" type="button" title="แก้ไข" data-edit="${record.id}">✎</button>
-              <button class="icon-btn delete" type="button" title="ลบ" data-delete="${record.id}">×</button>
+              <button class="icon-btn" type="button" title="แก้ไข" data-edit="${escapeAttribute(record.id)}">✎</button>
+              <button class="icon-btn delete" type="button" title="ลบ" data-delete="${escapeAttribute(record.id)}">×</button>
             </div>
           </td>
           <td>${displayValue(record.adminName)}</td>
@@ -2468,18 +2680,38 @@
           <td>${displayValue(formatDate(record.installDueDate))}</td>
           <td>${displayValue(record.paymentStatus)}</td>
         </tr>
-      `).join("");
+      `;
     }
 
-    function renderHistory() {
-      const actionText = {
-        create: "เพิ่มข้อมูล",
-        update: "แก้ไขข้อมูล",
-        delete: "ลบข้อมูล"
+    function renderTable() {
+      const token = ++tableRenderToken;
+      const rows = filteredRecords();
+      const duplicateLookup = getDuplicateLookup();
+      const body = $("#recordsBody");
+      $("#emptyState").hidden = rows.length > 0;
+      renderColumnFilterButtons();
+      body.innerHTML = "";
+      body.setAttribute("aria-busy", String(rows.length > 0));
+
+      let index = 0;
+      const appendChunk = () => {
+        if (token !== tableRenderToken) return;
+        const chunk = rows.slice(index, index + TABLE_RENDER_CHUNK_SIZE);
+        if (chunk.length) {
+          body.insertAdjacentHTML("beforeend", chunk.map((record) => recordRowHtml(record, duplicateLookup)).join(""));
+          index += chunk.length;
+        }
+        if (index < rows.length) {
+          window.requestAnimationFrame(appendChunk);
+        } else {
+          body.setAttribute("aria-busy", "false");
+        }
       };
-      const rows = filteredHistory();
-      $("#historyEmptyState").hidden = rows.length > 0;
-      $("#historyBody").innerHTML = rows.map((item) => `
+      appendChunk();
+    }
+
+    function historyRowHtml(item, actionText) {
+      return `
         <tr>
           <td>${displayValue(formatDate(item.timestamp))}</td>
           <td><span class="pill ${item.action === "delete" ? "cancelled" : item.action === "update" ? "pending" : "confirmed"}">${displayValue(actionText[item.action] || item.action)}</span></td>
@@ -2488,11 +2720,41 @@
           <td>${displayValue(item.trueId)}</td>
           <td>${displayValue(item.summary)}</td>
         </tr>
-      `).join("");
+      `;
     }
 
-    function renderAll() {
-      saveRecords();
+    function renderHistory() {
+      const token = ++historyRenderToken;
+      const actionText = {
+        create: "เพิ่มข้อมูล",
+        update: "แก้ไขข้อมูล",
+        delete: "ลบข้อมูล"
+      };
+      const rows = filteredHistory();
+      const body = $("#historyBody");
+      $("#historyEmptyState").hidden = rows.length > 0;
+      body.innerHTML = "";
+      body.setAttribute("aria-busy", String(rows.length > 0));
+
+      let index = 0;
+      const appendChunk = () => {
+        if (token !== historyRenderToken) return;
+        const chunk = rows.slice(index, index + TABLE_RENDER_CHUNK_SIZE);
+        if (chunk.length) {
+          body.insertAdjacentHTML("beforeend", chunk.map((item) => historyRowHtml(item, actionText)).join(""));
+          index += chunk.length;
+        }
+        if (index < rows.length) {
+          window.requestAnimationFrame(appendChunk);
+        } else {
+          body.setAttribute("aria-busy", "false");
+        }
+      };
+      appendChunk();
+    }
+
+    function renderAll(options = {}) {
+      if (options.persist !== false) markRecordsChanged();
       renderManagedNamePickers();
       renderDashboard();
       renderTable();
@@ -2558,13 +2820,18 @@
         setStatus("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App เพื่อโหลดประวัติ", true);
         return;
       }
+      const button = $("#refreshHistoryBtn");
+      if (button.disabled) return;
+      button.disabled = true;
       try {
-        const historyResult = await sheetRequest("history");
+        const historyResult = await sheetRequest("history", {}, { force: true });
         historyRecords = Array.isArray(historyResult.history) ? historyResult.history : [];
         renderHistory();
         setStatus(`โหลดประวัติ ${historyRecords.length} รายการแล้ว`);
       } catch (error) {
         setStatus(`โหลดประวัติไม่สำเร็จ: ${error.message}`, true);
+      } finally {
+        button.disabled = false;
       }
     });
     $("#saveUrlBtn").addEventListener("click", () => {
@@ -2572,12 +2839,18 @@
     });
     $("#syncBtn").addEventListener("click", loadFromSheet);
 
+    const debouncedTableSearch = debounce(renderTable);
+    const debouncedHistorySearch = debounce(renderHistory);
+    const debouncedColumnFilterSearch = debounce(renderColumnFilterOptions, 120);
+    const debouncedDuplicateCheck = debounce(checkDuplicateFields, 120);
+
     Object.keys(managedNameFields).forEach((field) => {
       const input = document.getElementById(field);
       const addInput = document.getElementById(`${field}New`);
 
       if (input) {
-        input.addEventListener("input", () => renderManagedNameOptionList(field));
+        const debouncedNameSearch = debounce(() => renderManagedNameOptionList(field), 120);
+        input.addEventListener("input", debouncedNameSearch);
         input.addEventListener("change", () => renderManagedNameOptionList(field));
       }
 
@@ -2614,12 +2887,14 @@
       });
     });
 
-    ["searchInput", "salesOrgFilter", "callVerFilter", "statusFilter", "provinceFilter"].forEach((id) => {
-      document.getElementById(id).addEventListener("input", renderTable);
+    ["searchInput", "provinceFilter"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", debouncedTableSearch);
+      document.getElementById(id).addEventListener("change", renderTable);
+    });
+    ["salesOrgFilter", "callVerFilter", "statusFilter"].forEach((id) => {
       document.getElementById(id).addEventListener("change", renderTable);
     });
     ["monthFilter", "dashboardMonthFilter"].forEach((id) => {
-      document.getElementById(id).addEventListener("input", (event) => setReportMonth(event.target.value));
       document.getElementById(id).addEventListener("change", (event) => setReportMonth(event.target.value));
     });
     document.querySelectorAll(".filter-btn").forEach((button) => {
@@ -2628,7 +2903,7 @@
         openColumnFilter(button);
       });
     });
-    $("#filterMenuSearch").addEventListener("input", renderColumnFilterOptions);
+    $("#filterMenuSearch").addEventListener("input", debouncedColumnFilterSearch);
     $("#filterMenuOptions").addEventListener("change", (event) => {
       if (event.target.matches("input[type='checkbox']")) {
         updateDraftColumnFilterValue(event.target.value, event.target.checked);
@@ -2649,7 +2924,7 @@
     ["salesmanContact", "customerContact"].forEach((id) => {
       document.getElementById(id).addEventListener("input", (event) => {
         event.target.value = event.target.value.replace(/\D/g, "").slice(0, 10);
-        checkDuplicateFields();
+        debouncedDuplicateCheck();
       });
       document.getElementById(id).addEventListener("blur", (event) => {
         event.target.value = normalizePhone(event.target.value);
@@ -2657,16 +2932,27 @@
       });
     });
     ["hiNumber", "trueId", "customerName"].forEach((id) => {
-      document.getElementById(id).addEventListener("input", checkDuplicateFields);
+      document.getElementById(id).addEventListener("input", debouncedDuplicateCheck);
       document.getElementById(id).addEventListener("change", checkDuplicateFields);
     });
-    ["historySearchInput", "historyActionFilter", "historyUserFilter"].forEach((id) => {
-      document.getElementById(id).addEventListener("input", renderHistory);
+    $("#historySearchInput").addEventListener("input", debouncedHistorySearch);
+    $("#historySearchInput").addEventListener("change", renderHistory);
+    ["historyActionFilter", "historyUserFilter"].forEach((id) => {
       document.getElementById(id).addEventListener("change", renderHistory);
     });
 
+    function setRecordSubmitting(isSubmitting) {
+      isSubmittingRecord = isSubmitting;
+      const form = $("#recordForm");
+      const submitButton = form.querySelector("button[type='submit']");
+      form.setAttribute("aria-busy", String(isSubmitting));
+      if (submitButton) submitButton.disabled = isSubmitting;
+    }
+
     $("#recordForm").addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (isSubmittingRecord) return;
+      setRecordSubmitting(true);
       const id = $("#recordId").value;
       const data = getFormData();
 
@@ -2696,8 +2982,20 @@
         switchView("table");
       } catch (error) {
         setStatus(`บันทึกไม่สำเร็จ: ${error.message}`, true);
+      } finally {
+        setRecordSubmitting(false);
       }
     });
+
+    async function refreshHistoryInBackground() {
+      try {
+        const historyResult = await sheetRequest("history", {}, { force: true });
+        historyRecords = Array.isArray(historyResult.history) ? historyResult.history : historyRecords;
+        renderHistory();
+      } catch (error) {
+        console.warn("โหลดประวัติหลังแก้ไขข้อมูลไม่สำเร็จ", error);
+      }
+    }
 
     $("#recordsBody").addEventListener("click", async (event) => {
       const editId = event.target.dataset.edit;
@@ -2708,18 +3006,24 @@
         if (record) fillForm(record);
       }
 
-      if (deleteId && confirm("ต้องการลบรายการนี้ใช่ไหม?")) {
+      if (deleteId && !pendingDeletes.has(deleteId) && confirm("ต้องการลบรายการนี้ใช่ไหม?")) {
+        const deleteButton = event.target.closest("button[data-delete]");
+        pendingDeletes.add(deleteId);
+        if (deleteButton) deleteButton.disabled = true;
         try {
           if (isAppsScriptWebApp) {
-            await sheetRequest("delete", { id: deleteId });
-            const historyResult = await sheetRequest("history");
-            historyRecords = Array.isArray(historyResult.history) ? historyResult.history : historyRecords;
+            const result = await sheetRequest("delete", { id: deleteId });
+            if (result.history) historyRecords.unshift(result.history);
+            else refreshHistoryInBackground();
             setStatus("ลบข้อมูลจาก Google Sheet แล้ว");
           }
           records = records.filter((item) => item.id !== deleteId);
           renderAll();
         } catch (error) {
           setStatus(`ลบไม่สำเร็จ: ${error.message}`, true);
+        } finally {
+          pendingDeletes.delete(deleteId);
+          if (deleteButton && deleteButton.isConnected) deleteButton.disabled = false;
         }
       }
     });
