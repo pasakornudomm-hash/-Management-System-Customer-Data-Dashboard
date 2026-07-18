@@ -1,0 +1,2735 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบจัดการข้อมูลลูกค้า</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue-900: #0a2f66;
+      --blue-800: #0e438b;
+      --blue-700: #1255ad;
+      --blue-600: #1769d1;
+      --blue-100: #eaf3ff;
+      --blue-050: #f5f9ff;
+      --ink: #14233b;
+      --muted: #64748b;
+      --line: #d9e5f7;
+      --white: #ffffff;
+      --green: #16803d;
+      --orange: #b75d00;
+      --red: #c62828;
+      --shadow: 0 14px 34px rgba(10, 47, 102, .12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Mali", system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #eef6ff 0%, #ffffff 44%, #f6faff 100%);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: linear-gradient(180deg, var(--blue-900), var(--blue-700));
+      color: var(--white);
+      padding: 18px 12px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, .16);
+      border: 1px solid rgba(255, 255, 255, .22);
+      font-weight: 800;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
+
+    .sidebar-footer {
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, .18);
+    }
+
+    .nav button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255, 255, 255, .88);
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .nav button:hover,
+    .nav button.active,
+    .settings-access:hover {
+      background: rgba(255, 255, 255, .16);
+      color: var(--white);
+    }
+
+    .settings-access {
+      width: 100%;
+      min-height: 36px;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: rgba(255, 255, 255, .68);
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .topbar p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    .primary-btn,
+    .ghost-btn,
+    .danger-btn {
+      border: 0;
+      border-radius: 8px;
+      min-height: 40px;
+      padding: 9px 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .primary-btn {
+      color: var(--white);
+      background: var(--blue-700);
+      box-shadow: 0 8px 18px rgba(18, 85, 173, .22);
+    }
+
+    .ghost-btn {
+      color: var(--blue-800);
+      background: var(--blue-100);
+    }
+
+    .danger-btn {
+      color: var(--red);
+      background: #fff0f0;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, .9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 110px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 30px;
+      color: var(--blue-800);
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, .85fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .install-cards {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .install-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      padding: 14px;
+    }
+
+    .install-card h4 {
+      margin: 0 0 12px;
+      color: var(--blue-900);
+      font-size: 15px;
+    }
+
+    .metric-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 0;
+      border-top: 1px solid #edf3fb;
+      font-size: 13px;
+    }
+
+    .metric-line strong {
+      color: var(--blue-800);
+      font-size: 16px;
+    }
+
+    .area-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .area-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--blue-050);
+      padding: 12px;
+      font-size: 13px;
+    }
+
+    .area-item-copy {
+      display: grid;
+      gap: 4px;
+    }
+
+    .area-item-copy small {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .area-item strong {
+      color: var(--blue-800);
+      font-size: 18px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title h3 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .compact-heading {
+      font-size: 17px !important;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 14px;
+    }
+
+    label,
+    .field-group {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      color: #29415f;
+      font-weight: 700;
+    }
+
+    .name-picker {
+      align-content: start;
+    }
+
+    .name-add-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mini-btn {
+      min-height: 40px;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+
+    .name-library {
+      border: 1px solid #dce7f6;
+      border-radius: 8px;
+      background: #f8fbff;
+      padding: 8px 10px;
+      font-weight: 600;
+    }
+
+    .name-library summary {
+      cursor: pointer;
+      color: var(--blue-700);
+      font-size: 13px;
+    }
+
+    .name-option-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 6px;
+      max-height: 170px;
+      overflow: auto;
+      padding-top: 8px;
+    }
+
+    .name-choice {
+      min-height: 32px;
+      border: 1px solid #cddcf0;
+      border-radius: 8px;
+      background: var(--white);
+      color: var(--blue-800);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      padding: 6px 8px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .name-choice:hover,
+    .name-choice:focus {
+      border-color: var(--blue-600);
+      box-shadow: 0 0 0 3px rgba(23, 105, 209, .12);
+    }
+
+    .name-list-note {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      grid-column: 1 / -1;
+      padding: 4px 2px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #cddcf0;
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--ink);
+      background: var(--white);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue-600);
+      box-shadow: 0 0 0 3px rgba(23, 105, 209, .14);
+    }
+
+    input.duplicate-warning {
+      border-color: var(--red);
+      background: #fff5f5;
+      box-shadow: 0 0 0 3px rgba(198, 40, 40, .14);
+    }
+
+    td.duplicate-cell {
+      background: #fff3cd;
+      color: #8a4b00;
+      font-weight: 700;
+    }
+
+    .wide {
+      grid-column: span 2;
+    }
+
+    .actions-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) repeat(5, minmax(150px, 180px)) auto;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .dashboard-toolbar {
+      display: flex;
+      align-items: end;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .dashboard-toolbar label {
+      min-width: 220px;
+      max-width: 260px;
+    }
+
+    #table .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .96);
+      box-shadow: 0 10px 24px rgba(10, 47, 102, .10);
+      backdrop-filter: blur(8px);
+    }
+
+    .settings-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .settings-panel[hidden] {
+      display: none;
+    }
+
+    .settings-names {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .connection-status {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      max-width: 100%;
+      max-height: 68vh;
+    }
+
+    .table-hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: -4px 0 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 2600px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e8eef8;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13.5px;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--blue-700);
+      color: var(--white);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .th-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .filter-btn {
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(255, 255, 255, .45);
+      border-radius: 6px;
+      color: var(--white);
+      background: rgba(255, 255, 255, .12);
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .filter-btn.active {
+      background: var(--white);
+      color: var(--blue-800);
+    }
+
+    .filter-menu {
+      position: fixed;
+      z-index: 50;
+      width: 280px;
+      max-height: 380px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      box-shadow: 0 18px 40px rgba(10, 47, 102, .22);
+      padding: 12px;
+    }
+
+    .filter-menu[hidden] {
+      display: none;
+    }
+
+    .filter-menu h4 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--blue-900);
+    }
+
+    .filter-options {
+      display: grid;
+      gap: 6px;
+      max-height: 210px;
+      overflow: auto;
+      margin: 10px 0;
+      padding-right: 4px;
+    }
+
+    .filter-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    .filter-option input {
+      width: 16px;
+      min-height: 16px;
+    }
+
+    .filter-menu-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .filter-action-mini {
+      min-width: 32px;
+      min-height: 32px;
+      padding: 0;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    tbody tr:hover {
+      background: var(--blue-050);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .pill.confirmed {
+      color: var(--green);
+      background: #eaf8ef;
+    }
+
+    .pill.pending {
+      color: var(--orange);
+      background: #fff5e8;
+    }
+
+    .pill.cancelled {
+      color: var(--red);
+      background: #fff0f0;
+    }
+
+    .pill.rejected {
+      color: #6d28d9;
+      background: #f3e8ff;
+    }
+
+    .pill.scheduled {
+      color: #be185d;
+      background: #fce7f3;
+    }
+
+    .pill.code-10047649 {
+      color: #16803d;
+      background: #eaf8ef;
+    }
+
+    .pill.code-10051943 {
+      color: #0e438b;
+      background: #eaf3ff;
+    }
+
+    .pill.code-10057880 {
+      color: #9a4d00;
+      background: #fff4e3;
+    }
+
+    .pill.code-10057882 {
+      color: #08736a;
+      background: #e6fffb;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    td:nth-child(7),
+    td:nth-child(20),
+    td:nth-child(22),
+    td:nth-child(23),
+    td:nth-child(24),
+    td:nth-child(25) {
+      min-width: 170px;
+    }
+
+    td:nth-child(12),
+    td:nth-child(15),
+    td:nth-child(21) {
+      min-width: 150px;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid #cddcf0;
+      border-radius: 8px;
+      background: var(--white);
+      color: var(--blue-800);
+      cursor: pointer;
+    }
+
+    .icon-btn.delete {
+      color: var(--red);
+    }
+
+    .chart {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(130px, 220px) 1fr 54px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .bar-row span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      height: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #dce9fb;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--blue-600);
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .chart-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .chart-list.compact {
+      max-height: 340px;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .map-panel {
+      display: grid;
+      grid-template-columns: minmax(340px, 1fr) minmax(260px, .65fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .province-map {
+      width: 100%;
+      min-height: 430px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #f8fbff, #eef6ff);
+    }
+
+    .area-card-map {
+      width: 100%;
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #f8fbff, #eef6ff);
+    }
+
+    .map-region {
+      stroke: #ffffff;
+      stroke-width: 3;
+      filter: drop-shadow(0 8px 12px rgba(10, 47, 102, .12));
+    }
+
+    .map-label {
+      font-size: 17px;
+      font-weight: 800;
+      fill: var(--blue-900);
+      pointer-events: none;
+    }
+
+    .map-count {
+      font-size: 22px;
+      font-weight: 800;
+      fill: var(--blue-700);
+      pointer-events: none;
+    }
+
+    .mini-map-label {
+      font-size: 15px;
+      font-weight: 800;
+      fill: var(--blue-900);
+      pointer-events: none;
+    }
+
+    .mini-map-count {
+      font-size: 22px;
+      font-weight: 800;
+      fill: var(--blue-700);
+      pointer-events: none;
+    }
+
+    .map-list {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .location-map-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .map-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      padding: 12px;
+    }
+
+    .map-list-item span {
+      font-weight: 700;
+    }
+
+    .map-list-item strong {
+      color: var(--blue-800);
+      font-size: 20px;
+    }
+
+    .bar-fill.completed {
+      background: var(--green);
+    }
+
+    .bar-fill.pending {
+      background: var(--orange);
+    }
+
+    .empty {
+      padding: 26px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+
+      .nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .stats-grid,
+      .dashboard-grid,
+      .chart-grid,
+      .map-panel,
+      .location-map-grid,
+      .form-grid,
+      .settings-names,
+      .dashboard-toolbar,
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .install-cards {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .main {
+        padding: 16px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav,
+      .stats-grid,
+      .dashboard-grid,
+      .chart-grid,
+      .map-panel,
+      .location-map-grid,
+      .install-cards,
+      .form-grid,
+      .settings-names,
+      .dashboard-toolbar,
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .wide {
+        grid-column: span 1;
+      }
+
+      .dashboard-toolbar {
+        justify-content: stretch;
+      }
+
+      .dashboard-toolbar label,
+      .dashboard-toolbar button {
+        width: 100%;
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">DB</div>
+        <h1>ระบบจัดการ<br>ข้อมูลลูกค้า</h1>
+      </div>
+      <nav class="nav" aria-label="เมนูหลัก">
+        <button class="active" type="button" data-target="dashboard" data-title="แดชบอร์ดติดตั้ง" data-description="สรุปยอดติดตั้งเรียบร้อย รอติดตั้ง และพื้นที่จาก Google Sheet">แดชบอร์ด</button>
+        <button type="button" data-target="form" data-title="คีย์ข้อมูลใหม่" data-description="เพิ่มหรือแก้ไขข้อมูลลูกค้าและงานติดตั้ง">คีย์ข้อมูลใหม่</button>
+        <button type="button" data-target="table" data-title="ค้นหาข้อมูล" data-description="ค้นหา กรอง แก้ไข ลบ และส่งออกข้อมูล">ค้นหาข้อมูล</button>
+        <button type="button" data-target="history" data-title="ประวัติการแก้ไข" data-description="ดูรายการเพิ่ม แก้ไข และลบข้อมูลย้อนหลัง">ประวัติการแก้ไข</button>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="settings-access" type="button" id="settingsAccessBtn">เครื่องมือข้อมูล</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 id="pageTitle">แดชบอร์ดติดตั้ง</h2>
+          <p id="pageDescription">สรุปยอดติดตั้งเรียบร้อย รอติดตั้ง และพื้นที่จาก Google Sheet</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="ghost-btn" type="button" id="refreshDataBtn">รีเฟรชข้อมูล</button>
+          <button class="primary-btn" type="button" id="newRecordBtn">+ เพิ่มรายการ</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="dashboard-toolbar">
+          <label>เดือนข้อมูล
+            <input id="dashboardMonthFilter" type="month">
+          </label>
+          <button class="ghost-btn" type="button" id="resetDashboardMonthBtn">ทุกเดือน</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat">
+            <span>ยอดติดตั้งทั้งหมด</span>
+            <strong id="totalInstallCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>ติดตั้งเรียบร้อย 100%</span>
+            <strong id="completedInstallCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>รอติดตั้ง</span>
+            <strong id="pendingInstallCount">0</strong>
+          </div>
+        </div>
+
+        <div class="panel settings-panel" id="settingsPanel" hidden>
+          <div class="section-title">
+            <h3>เครื่องมือข้อมูล</h3>
+            <button class="ghost-btn" type="button" id="lockSettingsBtn">ซ่อน</button>
+          </div>
+          <div class="settings-row">
+            <label>การเชื่อมต่อ Google Sheet
+              <input id="scriptUrl" readonly value="ใช้ Web App นี้เชื่อมต่ออัตโนมัติ">
+            </label>
+            <button class="ghost-btn" type="button" id="saveUrlBtn">โหลดข้อมูลใหม่</button>
+            <button class="primary-btn" type="button" id="syncBtn">ซิงก์ข้อมูล</button>
+          </div>
+          <div class="connection-status" id="connectionStatus">พร้อมเชื่อมต่อ Google Sheet ผ่าน Web App นี้</div>
+          <div class="settings-names">
+            <div class="field-group">
+              <span>เพิ่มชื่อเซลล์</span>
+              <div class="name-add-row">
+                <input id="salesNameNew" autocomplete="off" placeholder="เพิ่มชื่อเซลล์">
+                <button class="ghost-btn mini-btn" type="button" data-add-name="salesName">เพิ่ม</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <div class="section-title">
+              <h3>ยอดติดตั้งแยกพื้นที่</h3>
+            </div>
+            <div class="install-cards" id="installSummary"></div>
+            <div class="chart-list" id="installChart"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-title">
+              <h3>พื้นที่</h3>
+            </div>
+            <div class="area-grid" id="areaSummary"></div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="panel" style="grid-column: 1 / -1;">
+            <div class="section-title">
+              <h3>แผนที่จำนวนงานตามจังหวัด</h3>
+            </div>
+            <div class="table-hint">นับ AUTO จากข้อมูลล่าสุดในคอลัมน์จังหวัด ตำบล และอำเภอ</div>
+            <div class="map-panel">
+              <div id="provinceMap"></div>
+              <div class="map-list" id="provinceMapList"></div>
+            </div>
+            <div class="location-map-grid">
+              <div>
+                <div class="section-title">
+                  <h3>ตำบล</h3>
+                </div>
+                <div id="subDistrictMap"></div>
+                <div class="map-list" id="subDistrictMapList"></div>
+              </div>
+              <div>
+                <div class="section-title">
+                  <h3>อำเภอ</h3>
+                </div>
+                <div id="districtMap"></div>
+                <div class="map-list" id="districtMapList"></div>
+              </div>
+              <div>
+                <div class="section-title">
+                  <h3>จังหวัด</h3>
+                </div>
+                <div class="map-list" id="provinceAreaMapList"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel" style="grid-column: 1 / -1;">
+            <div class="section-title">
+              <h3>จำนวนงานตามภาค</h3>
+            </div>
+            <div class="table-hint">จัดภาค AUTO จากจังหวัด และใช้ค่าคอลัมน์ภาคเมื่อมีข้อมูลอยู่แล้ว</div>
+            <div class="map-panel">
+              <div id="regionMap"></div>
+              <div class="map-list" id="regionMapList"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="section-title">
+              <h3>จำนวนตามตำบล</h3>
+            </div>
+            <div class="chart-list compact" id="subDistrictChart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title">
+              <h3>จำนวนตามอำเภอ</h3>
+            </div>
+            <div class="chart-list compact" id="districtChart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title">
+              <h3>จำนวนตามจังหวัด</h3>
+            </div>
+            <div class="chart-list compact" id="provinceChart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title">
+              <h3>ภาค / พื้นที่ / คียงาน</h3>
+            </div>
+            <div class="chart-list compact" id="autoAreaChart"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title">
+            <h3>จำนวนชื่อซ้ำของเซลล์ 39</h3>
+          </div>
+          <div class="table-hint">นับจำนวนของแต่ละชื่อในคอลัมน์เซลล์ 39 ตามข้อมูลเดือนที่เลือก</div>
+          <div class="chart-list compact" id="cell39Chart"></div>
+        </div>
+      </section>
+
+      <section id="form" class="view panel">
+        <div class="section-title">
+          <h3 id="formTitle">คีย์ข้อมูลใหม่</h3>
+          <button class="ghost-btn" type="button" id="clearBtn">ล้างฟอร์ม</button>
+        </div>
+        <form id="recordForm">
+          <input type="hidden" id="recordId">
+          <div class="form-grid">
+            <label>แอดมิน
+              <input id="adminName" required autocomplete="name" placeholder="ชื่อแอดมิน">
+            </label>
+            <div class="field-group name-picker" data-name-picker="salesName">
+              <span>ชื่อเซลล์</span>
+              <input id="salesName" list="salesNameList" autocomplete="off" placeholder="พิมพ์ค้นหา/เลือกชื่อเซลล์">
+              <datalist id="salesNameList"></datalist>
+              <details class="name-library">
+                <summary>รายชื่อเซลล์</summary>
+                <div class="name-option-list" id="salesNameOptionList"></div>
+              </details>
+            </div>
+            <label>Saleman Contact
+              <input id="salesmanContact" required inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="เบอร์โทร 10 หลัก">
+            </label>
+            <label>HSI Number
+              <input id="hiNumber" required placeholder="เลข HSI">
+            </label>
+            <label>หมายเลข TRUE ID
+              <input id="trueId" placeholder="หมายเลข TRUE ID">
+            </label>
+            <label>Customer Name
+              <input id="customerName" required placeholder="ชื่อลูกค้า">
+            </label>
+            <label>Customer Contact
+              <input id="customerContact" required inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="เบอร์โทรลูกค้า 10 หลัก">
+            </label>
+            <label>Wo Create Time
+              <input id="woCreateTime" type="date">
+            </label>
+            <label>Confirmed Time
+              <input id="confirmedTime" type="date">
+            </label>
+            <label>Appointment Date
+              <input id="appointmentDate" type="date">
+            </label>
+            <label>โปรโมชั่น
+              <input id="promotion" placeholder="โปรโมชั่น">
+            </label>
+            <label>Sales Org
+              <select id="salesOrg" required>
+                <option value="">เลือก Sales Org</option>
+                <option>10047649</option>
+                <option>10051943</option>
+                <option>10057880</option>
+                <option>10057882</option>
+                <option>Cancelled</option>
+              </select>
+            </label>
+            <label>Call ver
+              <select id="callVer" required>
+                <option value="">เลือก Call ver</option>
+                <option>Approve</option>
+                <option>RETURN</option>
+                <option>Cancelled</option>
+              </select>
+            </label>
+            <label>Operation status
+              <select id="operationStatus" required>
+                <option value="">เลือก Operation status</option>
+                <option>Completed10047649</option>
+                <option>Completed10051943</option>
+                <option>Completed10057880</option>
+                <option>Completed10057882</option>
+                <option>Scheduled</option>
+                <option>Cancelled</option>
+                <option>Rejected</option>
+              </select>
+            </label>
+            <label>เซลล์ 39
+              <input id="cell39" placeholder="เซลล์ 39">
+            </label>
+            <label>ตำบล
+              <input id="subDistrict" placeholder="ตำบล">
+            </label>
+            <label>อำเภอ
+              <input id="district" placeholder="อำเภอ">
+            </label>
+            <label>จังหวัด
+              <input id="province" placeholder="จังหวัด">
+            </label>
+            <label>Sub-contrator name
+              <input id="subcontractorName" placeholder="ชื่อผู้รับเหมา">
+            </label>
+            <label>ภาค
+              <input id="region" readonly placeholder="คำนวณอัตโนมัติ">
+            </label>
+            <label>ในพื้นที่ ตัวเอง
+              <input id="ownArea" readonly placeholder="คำนวณอัตโนมัติ">
+            </label>
+            <label>พื้นที่คียงาน
+              <input id="workArea" readonly placeholder="คำนวณอัตโนมัติ">
+            </label>
+            <label>กำหนดติดตั้ง
+              <input id="installDueDate" readonly placeholder="คำนวณอัตโนมัติ">
+            </label>
+            <label>ทำจ่าย
+              <input id="paymentStatus" placeholder="สถานะทำจ่าย">
+            </label>
+            <label class="wide">หมายเหตุ
+              <textarea id="notes" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+            </label>
+          </div>
+          <div class="actions-row">
+            <button class="ghost-btn" type="button" id="cancelEditBtn">ยกเลิก</button>
+            <button class="primary-btn" type="submit">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="table" class="view panel">
+        <div class="section-title">
+          <h3 class="compact-heading">ค้นหาและแก้ไขข้อมูล</h3>
+          <button class="ghost-btn" type="button" id="exportBtn">ส่งออก CSV</button>
+        </div>
+        <div class="toolbar">
+          <input id="searchInput" placeholder="ค้นหาชื่อลูกค้า เบอร์โทร เลขออเดอร์ จังหวัด หรือผู้รับเหมา">
+          <input id="monthFilter" type="month" aria-label="กรองเดือนข้อมูล">
+          <select id="salesOrgFilter">
+            <option value="">ทุก Sales Org</option>
+            <option>10047649</option>
+            <option>10051943</option>
+            <option>10057880</option>
+            <option>10057882</option>
+            <option>Cancelled</option>
+          </select>
+          <select id="callVerFilter">
+            <option value="">ทุก Call ver</option>
+            <option>Approve</option>
+            <option>RETURN</option>
+            <option>Cancelled</option>
+          </select>
+          <select id="statusFilter">
+            <option value="">ทุกสถานะ</option>
+            <option>Completed10047649</option>
+            <option>Completed10051943</option>
+            <option>Completed10057880</option>
+            <option>Completed10057882</option>
+            <option>Scheduled</option>
+            <option>Cancelled</option>
+            <option>Rejected</option>
+          </select>
+          <input id="provinceFilter" placeholder="กรองจังหวัด">
+          <button class="ghost-btn" type="button" id="resetFilterBtn">รีเซ็ต</button>
+        </div>
+        <div class="table-hint">เลื่อนตารางซ้าย-ขวาเพื่อดูข้อมูลทุกคอลัมน์</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>จัดการ</th>
+                <th><span class="th-filter">แอดมิน <button class="filter-btn" type="button" data-field="adminName" data-label="แอดมิน">▾</button></span></th>
+                <th><span class="th-filter">ชื่อเซลล์ <button class="filter-btn" type="button" data-field="salesName" data-label="ชื่อเซลล์">▾</button></span></th>
+                <th><span class="th-filter">Saleman Contact <button class="filter-btn" type="button" data-field="salesmanContact" data-label="Saleman Contact">▾</button></span></th>
+                <th><span class="th-filter">HSI Number <button class="filter-btn" type="button" data-field="hiNumber" data-label="HSI Number">▾</button></span></th>
+                <th><span class="th-filter">หมายเลข TRUE ID <button class="filter-btn" type="button" data-field="trueId" data-label="หมายเลข TRUE ID">▾</button></span></th>
+                <th><span class="th-filter">Customer Name <button class="filter-btn" type="button" data-field="customerName" data-label="Customer Name">▾</button></span></th>
+                <th><span class="th-filter">Customer Contact <button class="filter-btn" type="button" data-field="customerContact" data-label="Customer Contact">▾</button></span></th>
+                <th><span class="th-filter">Wo Create Time <button class="filter-btn" type="button" data-field="woCreateTime" data-label="Wo Create Time">▾</button></span></th>
+                <th><span class="th-filter">Confirmed Time <button class="filter-btn" type="button" data-field="confirmedTime" data-label="Confirmed Time">▾</button></span></th>
+                <th><span class="th-filter">Appointment Date <button class="filter-btn" type="button" data-field="appointmentDate" data-label="Appointment Date">▾</button></span></th>
+                <th><span class="th-filter">โปรโมชั่น <button class="filter-btn" type="button" data-field="promotion" data-label="โปรโมชั่น">▾</button></span></th>
+                <th><span class="th-filter">Sales Org <button class="filter-btn" type="button" data-field="salesOrg" data-label="Sales Org">▾</button></span></th>
+                <th><span class="th-filter">Call ver <button class="filter-btn" type="button" data-field="callVer" data-label="Call ver">▾</button></span></th>
+                <th><span class="th-filter">Operation status <button class="filter-btn" type="button" data-field="operationStatus" data-label="Operation status">▾</button></span></th>
+                <th><span class="th-filter">เซลล์ 39 <button class="filter-btn" type="button" data-field="cell39" data-label="เซลล์ 39">▾</button></span></th>
+                <th><span class="th-filter">ตำบล <button class="filter-btn" type="button" data-field="subDistrict" data-label="ตำบล">▾</button></span></th>
+                <th><span class="th-filter">อำเภอ <button class="filter-btn" type="button" data-field="district" data-label="อำเภอ">▾</button></span></th>
+                <th><span class="th-filter">จังหวัด <button class="filter-btn" type="button" data-field="province" data-label="จังหวัด">▾</button></span></th>
+                <th><span class="th-filter">Sub-contrator name <button class="filter-btn" type="button" data-field="subcontractorName" data-label="Sub-contrator name">▾</button></span></th>
+                <th><span class="th-filter">ภาค <button class="filter-btn" type="button" data-field="region" data-label="ภาค">▾</button></span></th>
+                <th><span class="th-filter">ในพื้นที่ ตัวเอง <button class="filter-btn" type="button" data-field="ownArea" data-label="ในพื้นที่ ตัวเอง">▾</button></span></th>
+                <th><span class="th-filter">พื้นที่คียงาน <button class="filter-btn" type="button" data-field="workArea" data-label="พื้นที่คียงาน">▾</button></span></th>
+                <th><span class="th-filter">กำหนดติดตั้ง <button class="filter-btn" type="button" data-field="installDueDate" data-label="กำหนดติดตั้ง">▾</button></span></th>
+                <th><span class="th-filter">ทำจ่าย <button class="filter-btn" type="button" data-field="paymentStatus" data-label="ทำจ่าย">▾</button></span></th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+          <div class="empty" id="emptyState" hidden>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>
+        </div>
+      </section>
+
+      <section id="history" class="view panel">
+        <div class="section-title">
+          <h3>ประวัติการแก้ไข</h3>
+          <button class="ghost-btn" type="button" id="refreshHistoryBtn">รีเฟรชประวัติ</button>
+        </div>
+        <div class="toolbar">
+          <input id="historySearchInput" placeholder="ค้นหาชื่อลูกค้า TRUE ID ผู้แก้ไข หรือรายละเอียด">
+          <select id="historyActionFilter">
+            <option value="">ทุกประเภท</option>
+            <option value="create">เพิ่มข้อมูล</option>
+            <option value="update">แก้ไขข้อมูล</option>
+            <option value="delete">ลบข้อมูล</option>
+          </select>
+          <input id="historyUserFilter" placeholder="กรองผู้แก้ไข">
+          <button class="ghost-btn" type="button" id="resetHistoryBtn">รีเซ็ต</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>เวลา</th>
+                <th>ประเภท</th>
+                <th>ผู้แก้ไข</th>
+                <th>Customer Name</th>
+                <th>TRUE ID</th>
+                <th>รายละเอียด</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <div class="empty" id="historyEmptyState" hidden>ยังไม่มีประวัติการแก้ไข</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="filter-menu" id="columnFilterMenu" hidden>
+    <h4 id="filterMenuTitle">ตัวกรอง</h4>
+    <input id="filterMenuSearch" placeholder="ค้นหาค่าในคอลัมน์">
+    <div class="filter-options" id="filterMenuOptions"></div>
+    <div class="filter-menu-actions">
+      <button class="ghost-btn filter-action-mini" type="button" id="uncheckAllColumnFilterBtn" title="เอาติ๊กออกทั้งหมด" aria-label="เอาติ๊กออกทั้งหมด">□</button>
+      <button class="ghost-btn" type="button" id="clearColumnFilterBtn">ล้าง</button>
+      <button class="primary-btn" type="button" id="applyColumnFilterBtn">ใช้ตัวกรอง</button>
+    </div>
+  </div>
+
+  <script>
+    const storageKey = "blue-customer-records-v1";
+    const managedNamesKey = "blue-customer-records-managed-names-v1";
+    const adminNameMemoryKey = "blue-customer-records-admin-name-v1";
+    const reportMonthKey = "blue-customer-records-report-month-v1";
+    const gasModeLabel = "ใช้ Web App นี้เชื่อมต่ออัตโนมัติ";
+    const fields = [
+      "adminName", "salesName", "salesmanContact", "hiNumber", "trueId", "customerName",
+      "customerContact", "woCreateTime", "confirmedTime", "appointmentDate",
+      "promotion", "salesOrg", "callVer", "operationStatus", "cell39", "subDistrict",
+      "district", "province", "subcontractorName", "region", "ownArea",
+      "workArea", "installDueDate", "paymentStatus", "notes"
+    ];
+    const managedNameFields = {
+      salesName: {
+        label: "ชื่อเซลล์",
+        defaults: []
+      }
+    };
+    const statusText = {
+      confirmed: "ยืนยันแล้ว",
+      pending: "รอดำเนินการ",
+      cancelled: "ยกเลิก",
+      Completed10047649: "Completed10047649",
+      Completed10051943: "Completed10051943",
+      Completed10057880: "Completed10057880",
+      Completed10057882: "Completed10057882",
+      Scheduled: "Scheduled",
+      Cancelled: "Cancelled",
+      Rejected: "Rejected"
+    };
+    const installTargets = [
+      { key: "chon1", label: "ชล1", code: "10047649" },
+      { key: "chon2", label: "ชล2", code: "10051943" },
+      { key: "rayong", label: "ระยอง", code: "10047541" },
+      { key: "chanthaburi", label: "จันทบุรี", code: "10057880" },
+      { key: "trat", label: "ตราด", code: "10057882" }
+    ];
+    const areaTargets = [
+      { key: "redCbr01", label: "พื้นที่ ไข่แดงCBR 01", text: "พื้นที่ ไข่แดงCBR 01" },
+      { key: "ownCbr01", label: "ในพื้นที่ตัวเอง CBR 01", text: "ในพื้นที่ตัวเอง CBR 01" },
+      { key: "redCbr02", label: "พื้นที่ ไข่แดงCBR 02", text: "พื้นที่ ไข่แดงCBR 02" },
+      { key: "ownCbr02", label: "ในพื้นที่ตัวเอง CBR 02", text: "ในพื้นที่ตัวเอง CBR 02" },
+      {
+        key: "nongPrueCompletedChon2",
+        label: "พื้นที่หนองปรือ",
+        description: "ตำบลหนองปรือ / อำเภอบางละมุง / จังหวัดชลบุรี / Completed10051943",
+        filters: {
+          subDistrict: "หนองปรือ",
+          district: "บางละมุง",
+          province: "ชลบุรี",
+          operationStatus: "Completed10051943"
+        }
+      },
+      {
+        key: "mueangChonburiCompletedChon1",
+        label: "พื้นที่เมืองชลบุรี",
+        description: "อำเภอเมืองชลบุรี / จังหวัดชลบุรี / Completed10047649",
+        filters: {
+          district: "เมืองชลบุรี",
+          province: "ชลบุรี",
+          operationStatus: "Completed10047649"
+        }
+      }
+    ];
+    const duplicateAlertFields = ["hiNumber", "trueId", "customerName", "customerContact"];
+
+    const sampleRecords = [
+      {
+        id: makeId(),
+        adminName: "Admin",
+        salesName: "คุณเอ",
+        salesmanContact: "0812345678",
+        hiNumber: "HI-2451",
+        trueId: "TRUE-0001",
+        customerName: "บริษัท ตัวอย่าง จำกัด",
+        customerContact: "0891234567",
+        woCreateTime: "2026-05-27",
+        confirmedTime: "2026-05-27",
+        appointmentDate: "2026-05-27",
+        promotion: "โปรติดตั้ง",
+        salesOrg: "10047649",
+        callVer: "Approve",
+        operationStatus: "Completed10047649",
+        cell39: "39-A",
+        subDistrict: "สีลม",
+        district: "บางรัก",
+        province: "กรุงเทพมหานคร",
+        subcontractorName: "ทีมติดตั้ง A",
+        region: "กลาง",
+        ownArea: "ในพื้นที่ตัวเอง CBR 01",
+        workArea: "พื้นที่ ไข่แดงCBR 01",
+        installDueDate: "2026-05-28",
+        paymentStatus: "รอทำจ่าย",
+        notes: "นัดหมายเรียบร้อย"
+      },
+      {
+        id: makeId(),
+        adminName: "Admin",
+        salesName: "คุณบี",
+        salesmanContact: "0823456789",
+        hiNumber: "HI-2452",
+        trueId: "TRUE-0002",
+        customerName: "คุณสมชาย",
+        customerContact: "0834567890",
+        woCreateTime: "2026-05-26",
+        confirmedTime: "",
+        appointmentDate: "2026-05-30",
+        promotion: "โปรรายเดือน",
+        salesOrg: "10051943",
+        callVer: "RETURN",
+        operationStatus: "Completed10051943",
+        cell39: "39-B",
+        subDistrict: "เสม็ด",
+        district: "เมืองชลบุรี",
+        province: "ชลบุรี",
+        subcontractorName: "ทีมช่าง B",
+        region: "ตะวันออก",
+        ownArea: "ในพื้นที่ตัวเอง CBR 02",
+        workArea: "พื้นที่ ไข่แดงCBR 02",
+        installDueDate: "2026-05-30",
+        paymentStatus: "ยังไม่ทำจ่าย",
+        notes: "รอลูกค้ายืนยันเวลา"
+      }
+    ];
+
+    let records = JSON.parse(localStorage.getItem(storageKey) || "null") || sampleRecords;
+    let managedNameOptions = {};
+    try {
+      managedNameOptions = JSON.parse(localStorage.getItem(managedNamesKey) || "{}") || {};
+    } catch (error) {
+      managedNameOptions = {};
+    }
+    const isAppsScriptWebApp = Boolean(typeof google !== "undefined" && google.script && google.script.run);
+    let scriptUrl = isAppsScriptWebApp ? "embedded" : "";
+    let reportMonth = localStorage.getItem(reportMonthKey) || "";
+    let dashboardSummary = null;
+    let historyRecords = [];
+    let columnFilters = {};
+    let activeFilterField = "";
+    let activeFilterValues = [];
+
+    const $ = (selector) => document.querySelector(selector);
+
+    function saveRecords() {
+      localStorage.setItem(storageKey, JSON.stringify(records));
+    }
+
+    function makeId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return `id-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+    }
+
+    function setStatus(message, isError = false) {
+      const status = $("#connectionStatus");
+      status.textContent = message;
+      status.style.color = isError ? "var(--red)" : "var(--muted)";
+    }
+
+    function normalizeNameOption(value) {
+      return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function displayValue(value) {
+      const text = String(value || "").trim();
+      return text ? escapeHtml(text) : "-";
+    }
+
+    function rememberedAdminName() {
+      return localStorage.getItem(adminNameMemoryKey) || "";
+    }
+
+    function applyRememberedAdminName() {
+      const input = $("#adminName");
+      if (input && !input.value) {
+        input.value = rememberedAdminName();
+      }
+    }
+
+    function rememberAdminName(value) {
+      const name = normalizeNameOption(value);
+      if (name) {
+        localStorage.setItem(adminNameMemoryKey, name);
+      }
+    }
+
+    function normalizeMonthValue(value) {
+      const match = String(value || "").trim().match(/^(\d{4})-(\d{1,2})/);
+      return match ? `${match[1]}-${match[2].padStart(2, "0")}` : "";
+    }
+
+    function syncReportMonthInputs() {
+      ["monthFilter", "dashboardMonthFilter"].forEach((id) => {
+        const input = document.getElementById(id);
+        if (input) input.value = reportMonth;
+      });
+    }
+
+    function setReportMonth(value) {
+      reportMonth = normalizeMonthValue(value);
+      if (reportMonth) {
+        localStorage.setItem(reportMonthKey, reportMonth);
+      } else {
+        localStorage.removeItem(reportMonthKey);
+      }
+      syncReportMonthInputs();
+      renderDashboard();
+      renderTable();
+    }
+
+    function monthFromDateValue(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+
+      const isoMatch = text.match(/^(\d{4})-(\d{1,2})/);
+      if (isoMatch) return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}`;
+
+      const slashMatch = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+      if (slashMatch) {
+        let year = Number(slashMatch[3]);
+        if (year > 2400) year -= 543;
+        return `${year}-${slashMatch[2].padStart(2, "0")}`;
+      }
+
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+      }
+
+      return "";
+    }
+
+    function recordMatchesReportMonth(record) {
+      if (!reportMonth) return true;
+      return monthFromDateValue(record.appointmentDate) === reportMonth;
+    }
+
+    function dashboardRecords() {
+      return records.filter(recordMatchesReportMonth);
+    }
+
+    function uniqueNameOptions(values) {
+      const seen = new Set();
+      return values.map(normalizeNameOption).filter(Boolean).filter((value) => {
+        const key = value.toLocaleLowerCase("th");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function saveManagedNameOptions() {
+      localStorage.setItem(managedNamesKey, JSON.stringify(managedNameOptions));
+    }
+
+    function managedNameValues(field) {
+      const config = managedNameFields[field];
+      if (!config) return [];
+      return uniqueNameOptions([
+        ...(config.defaults || []),
+        ...(managedNameOptions[field] || []),
+        ...records.map((record) => record[field])
+      ]).sort((a, b) => a.localeCompare(b, "th"));
+    }
+
+    function renderManagedNamePickers() {
+      Object.keys(managedNameFields).forEach(renderManagedNamePicker);
+    }
+
+    function renderManagedNamePicker(field) {
+      const input = document.getElementById(field);
+      const dataList = document.getElementById(`${field}List`);
+      if (!input || !dataList) return;
+
+      const values = managedNameValues(field);
+      dataList.innerHTML = values.map((value) => `<option value="${escapeAttribute(value)}"></option>`).join("");
+      renderManagedNameOptionList(field, values);
+    }
+
+    function renderManagedNameOptionList(field, values = managedNameValues(field)) {
+      const input = document.getElementById(field);
+      const list = document.getElementById(`${field}OptionList`);
+      if (!input || !list) return;
+
+      const query = normalizeNameOption(input.value).toLocaleLowerCase("th");
+      const matched = query
+        ? values.filter((value) => value.toLocaleLowerCase("th").includes(query))
+        : values;
+      const visible = matched.slice(0, 80);
+      const buttons = visible.map((value) => `
+        <button class="name-choice" type="button" title="${escapeAttribute(value)}" data-pick-field="${field}" data-pick-name="${escapeAttribute(value)}">
+          ${escapeHtml(value)}
+        </button>
+      `).join("");
+      const note = matched.length > visible.length
+        ? `<div class="name-list-note">พิมพ์ค้นหาเพื่อกรองชื่อที่เหลืออีก ${matched.length - visible.length} รายการ</div>`
+        : "";
+
+      list.innerHTML = buttons || `<div class="name-list-note">ยังไม่มีชื่อนี้ กดเพิ่มเพื่อเก็บไว้</div>`;
+      if (buttons && note) {
+        list.insertAdjacentHTML("beforeend", note);
+      }
+    }
+
+    function addManagedNameOption(field, rawValue) {
+      const config = managedNameFields[field];
+      const value = normalizeNameOption(rawValue);
+      if (!config || !value) {
+        setStatus("กรุณาใส่ชื่อก่อนเพิ่ม", true);
+        return;
+      }
+
+      const existing = managedNameValues(field).some((name) => name.toLocaleLowerCase("th") === value.toLocaleLowerCase("th"));
+      if (!existing) {
+        managedNameOptions[field] = uniqueNameOptions([...(managedNameOptions[field] || []), value]);
+        saveManagedNameOptions();
+      }
+
+      const mainInput = document.getElementById(field);
+      const addInput = document.getElementById(`${field}New`);
+      if (mainInput) mainInput.value = value;
+      if (addInput) addInput.value = "";
+      renderManagedNamePicker(field);
+      setStatus(existing ? `มีชื่อ "${value}" ในรายการ${config.label}แล้ว` : `เพิ่ม "${value}" ในรายการ${config.label}แล้ว`);
+    }
+
+    function unlockSettings() {
+      $("#settingsPanel").hidden = false;
+      switchView("dashboard");
+      $("#syncBtn").focus();
+    }
+
+    async function sheetRequest(action, payload = {}) {
+      if (!isAppsScriptWebApp) {
+        throw new Error("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App");
+      }
+
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (!result || !result.ok) {
+              reject(new Error((result && result.error) || "Google Sheet ส่งผลลัพธ์ไม่สำเร็จ"));
+              return;
+            }
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            reject(new Error((error && error.message) || String(error || "เชื่อมต่อ Google Apps Script ไม่สำเร็จ")));
+          })
+          .api(action, payload);
+      });
+    }
+
+    async function loadFromSheet() {
+      if (!isAppsScriptWebApp) {
+        setStatus("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App เพื่อเชื่อม Google Sheet", true);
+        return;
+      }
+      setStatus("กำลังโหลดข้อมูลจาก Google Sheet...");
+      try {
+        const result = await sheetRequest("list");
+        records = Array.isArray(result.records) ? result.records : [];
+        dashboardSummary = null;
+        try {
+          const historyResult = await sheetRequest("history");
+          historyRecords = Array.isArray(historyResult.history) ? historyResult.history : [];
+        } catch (historyError) {
+          historyRecords = [];
+          console.warn(historyError);
+        }
+        renderAll();
+        setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ`);
+      } catch (error) {
+        setStatus(`เชื่อมต่อไม่สำเร็จ: ${error.message}`, true);
+      }
+    }
+
+    function switchView(target) {
+      document.querySelectorAll(".nav button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.target === target);
+      });
+      document.querySelectorAll(".view").forEach((view) => {
+        view.classList.toggle("active", view.id === target);
+      });
+      const activeButton = document.querySelector(`.nav button[data-target="${target}"]`);
+      if (activeButton) {
+        $("#pageTitle").textContent = activeButton.dataset.title;
+        $("#pageDescription").textContent = activeButton.dataset.description;
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetForm() {
+      $("#recordForm").reset();
+      $("#recordId").value = "";
+      $("#formTitle").textContent = "คีย์ข้อมูลใหม่";
+      $("#cancelEditBtn").style.display = "none";
+      applyRememberedAdminName();
+      renderManagedNamePickers();
+      checkDuplicateFields();
+    }
+
+    function getFormData() {
+      calculateAutoFields();
+      const data = {};
+      fields.forEach((field) => {
+        data[field] = document.getElementById(field).value.trim();
+      });
+      data.salesmanContact = normalizePhone(data.salesmanContact);
+      data.customerContact = normalizePhone(data.customerContact);
+      return data;
+    }
+
+    function fillForm(record) {
+      fields.forEach((field) => {
+        const value = field === "salesmanContact" || field === "customerContact"
+          ? normalizePhone(record[field])
+          : record[field] || "";
+        document.getElementById(field).value = value;
+      });
+      $("#recordId").value = record.id;
+      $("#formTitle").textContent = `แก้ไขข้อมูล ${record.customerName || record.trueId || record.adminName}`;
+      $("#cancelEditBtn").style.display = "inline-flex";
+      renderManagedNamePickers();
+      checkDuplicateFields();
+      switchView("form");
+    }
+
+    function normalizePhone(value) {
+      const digits = String(value || "").replace(/\D/g, "");
+      if (!digits) return "";
+      return digits.length < 10 ? digits.padStart(10, "0") : digits.slice(-10);
+    }
+
+    function checkDuplicateFields() {
+      const currentId = $("#recordId").value;
+      const duplicateFields = duplicateAlertFields;
+
+      duplicateFields.forEach((field) => {
+        const input = document.getElementById(field);
+        const rawValue = input.value.trim();
+        const value = normalizedDuplicateValue(field, rawValue);
+        const hasDuplicate = Boolean(value) && records.some((record) => {
+          if (record.id === currentId) return false;
+          const recordValue = normalizedDuplicateValue(field, record[field]);
+          return recordValue === value;
+        });
+
+        input.classList.toggle("duplicate-warning", hasDuplicate);
+        input.title = hasDuplicate ? "ข้อมูลนี้ซ้ำกับรายการเดิม แต่ยังสามารถบันทึกได้" : "";
+      });
+    }
+
+    function normalizedDuplicateValue(field, value) {
+      if (field === "customerContact") return normalizePhone(value);
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function buildDuplicateLookup(sourceRecords = records) {
+      const counts = Object.fromEntries(duplicateAlertFields.map((field) => [field, new Map()]));
+
+      sourceRecords.forEach((record) => {
+        duplicateAlertFields.forEach((field) => {
+          const value = normalizedDuplicateValue(field, record[field]);
+          if (!value) return;
+          counts[field].set(value, (counts[field].get(value) || 0) + 1);
+        });
+      });
+
+      return Object.fromEntries(duplicateAlertFields.map((field) => [
+        field,
+        new Set([...counts[field].entries()].filter(([, count]) => count > 1).map(([value]) => value))
+      ]));
+    }
+
+    function isDuplicateRecordValue(record, field, duplicateLookup) {
+      const value = normalizedDuplicateValue(field, record[field]);
+      return Boolean(value) && duplicateLookup[field]?.has(value);
+    }
+
+    function duplicateCellAttrs(record, field, duplicateLookup) {
+      return isDuplicateRecordValue(record, field, duplicateLookup)
+        ? ` class="duplicate-cell" title="ข้อมูลซ้ำกับรายการอื่น"`
+        : "";
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      return value.replace("T", " ");
+    }
+
+    function recordsForTableFilters(options = {}) {
+      const excludeColumnField = options.excludeColumnField || "";
+      const keyword = $("#searchInput").value.trim().toLowerCase();
+      const salesOrg = $("#salesOrgFilter").value;
+      const callVer = $("#callVerFilter").value;
+      const status = $("#statusFilter").value;
+      const province = $("#provinceFilter").value.trim().toLowerCase();
+
+      return records.filter((record) => {
+        const text = fields.map((field) => record[field] || "").join(" ").toLowerCase();
+        const matchKeyword = !keyword || text.includes(keyword);
+        const matchSalesOrg = !salesOrg || record.salesOrg === salesOrg;
+        const matchCallVer = !callVer || record.callVer === callVer;
+        const matchStatus = !status || record.operationStatus === status;
+        const matchProvince = !province || (record.province || "").toLowerCase().includes(province);
+        const matchMonth = recordMatchesReportMonth(record);
+        const matchColumns = Object.entries(columnFilters).every(([field, values]) => {
+          if (field === excludeColumnField) return true;
+          if (!values || values.length === 0) return true;
+          const value = String(record[field] || "");
+          return values.includes(value);
+        });
+        return matchKeyword && matchSalesOrg && matchCallVer && matchStatus && matchProvince && matchMonth && matchColumns;
+      });
+    }
+
+    function filteredRecords() {
+      return recordsForTableFilters();
+    }
+
+    function uniqueColumnValues(field) {
+      return [...new Set(recordsForTableFilters({ excludeColumnField: field }).map((record) => String(record[field] || "").trim() || "(ว่าง)"))]
+        .sort((a, b) => a.localeCompare(b, "th"));
+    }
+
+    function normalizedColumnFilterValue(value) {
+      return value === "(ว่าง)" ? "" : value;
+    }
+
+    function openColumnFilter(button) {
+      activeFilterField = button.dataset.field;
+      $("#filterMenuTitle").textContent = `กรอง: ${button.dataset.label}`;
+      $("#filterMenuSearch").value = "";
+      activeFilterValues = columnFilters[activeFilterField]
+        ? [...columnFilters[activeFilterField]]
+        : uniqueColumnValues(activeFilterField).map(normalizedColumnFilterValue);
+      renderColumnFilterOptions();
+
+      const rect = button.getBoundingClientRect();
+      const menu = $("#columnFilterMenu");
+      menu.hidden = false;
+      const left = Math.min(rect.left, window.innerWidth - 300);
+      menu.style.left = `${Math.max(12, left)}px`;
+      menu.style.top = `${rect.bottom + 8}px`;
+    }
+
+    function renderColumnFilterOptions() {
+      const search = $("#filterMenuSearch").value.trim().toLowerCase();
+      const values = uniqueColumnValues(activeFilterField).filter((value) => value.toLowerCase().includes(search));
+
+      $("#filterMenuOptions").innerHTML = values.map((value) => {
+        const checked = activeFilterValues.includes(normalizedColumnFilterValue(value));
+        return `
+          <label class="filter-option">
+            <input type="checkbox" value="${escapeAttribute(value)}" ${checked ? "checked" : ""}>
+            <span>${escapeHtml(value)}</span>
+          </label>
+        `;
+      }).join("") || `<div class="empty">ไม่พบค่าในคอลัมน์นี้</div>`;
+    }
+
+    function updateDraftColumnFilterValue(rawValue, checked) {
+      const value = normalizedColumnFilterValue(rawValue);
+      if (checked) {
+        if (!activeFilterValues.includes(value)) {
+          activeFilterValues = [...activeFilterValues, value];
+        }
+        return;
+      }
+      activeFilterValues = activeFilterValues.filter((item) => item !== value);
+    }
+
+    function uncheckAllColumnFilterOptions() {
+      activeFilterValues = [];
+      document.querySelectorAll("#filterMenuOptions input[type='checkbox']").forEach((input) => {
+        input.checked = false;
+      });
+    }
+
+    function applyColumnFilter() {
+      const checkedValues = [...activeFilterValues];
+      const allValues = uniqueColumnValues(activeFilterField).map(normalizedColumnFilterValue);
+
+      if (checkedValues.length === 0 || checkedValues.length === allValues.length) {
+        delete columnFilters[activeFilterField];
+      } else {
+        columnFilters[activeFilterField] = checkedValues;
+      }
+
+      closeColumnFilter();
+      renderTable();
+    }
+
+    function clearColumnFilter() {
+      delete columnFilters[activeFilterField];
+      closeColumnFilter();
+      renderTable();
+    }
+
+    function closeColumnFilter() {
+      $("#columnFilterMenu").hidden = true;
+      activeFilterField = "";
+      activeFilterValues = [];
+    }
+
+    function renderColumnFilterButtons() {
+      document.querySelectorAll(".filter-btn").forEach((button) => {
+        button.classList.toggle("active", Boolean(columnFilters[button.dataset.field]?.length));
+      });
+    }
+
+    function statusPillClass(status) {
+      const value = String(status || "");
+      if (value.includes("10047649")) return "code-10047649";
+      if (value.includes("10051943")) return "code-10051943";
+      if (value.includes("10057880")) return "code-10057880";
+      if (value.includes("10057882")) return "code-10057882";
+      if (value === "Rejected") return "rejected";
+      if (value === "Scheduled") return "scheduled";
+      if (value === "RETURN" || value === "Cancelled" || value === "cancelled") return "cancelled";
+      return "pending";
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function escapeAttribute(value) {
+      return escapeHtml(value);
+    }
+
+    function calculateAutoFields() {
+      const subDistrict = $("#subDistrict").value.trim();
+      const district = $("#district").value.trim();
+      const province = $("#province").value.trim();
+      const salesOrg = $("#salesOrg").value;
+      const woDate = $("#woCreateTime").value;
+      const confirmedDate = $("#confirmedTime").value;
+
+      $("#region").value = /ชลบุรี|ระยอง|จันทบุรี|ตราด|สระแก้ว|ปราจีนบุรี|ฉะเชิงเทรา/.test(province)
+        ? "ภาคตะวันออก"
+        : "";
+
+      let ownArea = "";
+      if (/หนองปรือ/.test(subDistrict) && /บางละมุง/.test(district)) {
+        ownArea = "พื้นที่ ไข่แดงCBR 02";
+      } else if (/บางละมุง|สัตหีบ/.test(district)) {
+        ownArea = "ในพื้นที่ตัวเอง CBR 02";
+      } else if (/พนัสนิคม|พานทอง|เกาะจันทร์/.test(district)) {
+        ownArea = "ในพื้นที่ตัวเอง CBR 01";
+      } else if (/เมืองชลบุรี/.test(district)) {
+        ownArea = "พื้นที่ ไข่แดงCBR 01";
+      }
+      $("#ownArea").value = province ? ownArea : "";
+
+      const cbr01Districts = ["เมืองชลบุรี", "พานทอง", "บ้านบึง", "พนัสนิคม", "บ่อทอง", "หนองใหญ่"];
+      const cbr02Districts = ["บางละมุง", "ศรีราชา", "สัตหีบ"];
+      const chanTratProvinces = ["จันทบุรี", "ตราด"];
+      const workAreaOk =
+        (salesOrg === "10047649" && cbr01Districts.includes(district)) ||
+        (salesOrg === "10051943" && cbr02Districts.includes(district)) ||
+        ((salesOrg === "10057880" || salesOrg === "10057882") && chanTratProvinces.includes(province));
+      $("#workArea").value = salesOrg ? (workAreaOk ? "พื้นที่คีย์งานถูกต้อง" : "") : "";
+
+      $("#installDueDate").value = getInstallDueText(woDate, confirmedDate);
+    }
+
+    function getInstallDueText(woDate, confirmedDate) {
+      if (!woDate) return "";
+      const wo = new Date(`${woDate}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (!confirmedDate) {
+        const expected = new Date(wo);
+        expected.setDate(expected.getDate() + 1);
+        if (today > expected) return "เกินระยะเวลา เร่งตรวจสอบ";
+        return `คาดว่าจะติดตั้งไม่เกิน ${formatThaiDate(expected)}`;
+      }
+
+      const confirmed = new Date(`${confirmedDate}T00:00:00`);
+      const diffDays = Math.floor((confirmed - wo) / 86400000);
+      return diffDays <= 2 ? "ไม่เกินระยะเวลา" : `เกินระยะเวลาติดตั้งไป ${diffDays} วัน`;
+    }
+
+    function formatThaiDate(date) {
+      return date.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+
+    function countByField(field, sourceRecords = records) {
+      return sourceRecords.reduce((acc, record) => {
+        const value = normalizeLocationValue(record[field], field) || "(ว่าง)";
+        acc[value] = (acc[value] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function withoutEmptyBucket(items) {
+      return Object.fromEntries(Object.entries(items).filter(([key]) => key !== "(ว่าง)"));
+    }
+
+    function normalizeLocationValue(value, field) {
+      let text = String(value || "").replace(/\s+/g, " ").trim();
+      if (!text) return "";
+      if (field === "province") text = text.replace(/^จังหวัด\s*/, "");
+      if (field === "district") text = text.replace(/^อำเภอ\s*/, "").replace(/^เขต\s*/, "");
+      if (field === "subDistrict") text = text.replace(/^ตำบล\s*/, "").replace(/^แขวง\s*/, "");
+      return text;
+    }
+
+    function countCombinedFields(fieldsToCount, sourceRecords = records) {
+      return fieldsToCount.reduce((acc, field) => {
+        sourceRecords.forEach((record) => {
+          const value = String(record[field] || "").trim();
+          if (value) {
+            const label = `${fieldLabel(field)}: ${value}`;
+            acc[label] = (acc[label] || 0) + 1;
+          }
+        });
+      return acc;
+    }, {});
+    }
+
+    function countByRegionAuto(sourceRecords = records) {
+      return sourceRecords.reduce((acc, record) => {
+        const region = normalizeLocationValue(record.region, "region") || getRegionFromProvince(record.province) || "(ว่าง)";
+        acc[region] = (acc[region] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function getRegionFromProvince(province) {
+      const value = normalizeLocationValue(province, "province");
+      const regionMap = {
+        "ภาคตะวันออก": ["ชลบุรี", "ระยอง", "จันทบุรี", "ตราด", "สระแก้ว", "ปราจีนบุรี", "ฉะเชิงเทรา"],
+        "ภาคกลาง": ["กรุงเทพมหานคร", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ", "สมุทรสาคร", "นครปฐม", "พระนครศรีอยุธยา", "สระบุรี", "ลพบุรี", "สิงห์บุรี", "ชัยนาท", "อ่างทอง"],
+        "ภาคเหนือ": ["เชียงใหม่", "เชียงราย", "ลำพูน", "ลำปาง", "แพร่", "น่าน", "พะเยา", "แม่ฮ่องสอน", "อุตรดิตถ์"],
+        "ภาคตะวันออกเฉียงเหนือ": ["นครราชสีมา", "ขอนแก่น", "อุดรธานี", "อุบลราชธานี", "บุรีรัมย์", "สุรินทร์", "ศรีสะเกษ", "ร้อยเอ็ด", "มหาสารคาม", "กาฬสินธุ์", "สกลนคร", "นครพนม", "มุกดาหาร", "ชัยภูมิ", "เลย", "หนองคาย", "บึงกาฬ", "หนองบัวลำภู", "ยโสธร", "อำนาจเจริญ"],
+        "ภาคตะวันตก": ["กาญจนบุรี", "ราชบุรี", "เพชรบุรี", "ประจวบคีรีขันธ์", "ตาก"],
+        "ภาคใต้": ["ชุมพร", "ระนอง", "สุราษฎร์ธานี", "พังงา", "ภูเก็ต", "กระบี่", "นครศรีธรรมราช", "ตรัง", "พัทลุง", "สงขลา", "สตูล", "ปัตตานี", "ยะลา", "นราธิวาส"]
+      };
+
+      return Object.entries(regionMap).find(([, provinces]) => provinces.includes(value))?.[0] || "";
+    }
+
+    function fieldLabel(field) {
+      const labels = {
+        region: "ภาค",
+        ownArea: "ในพื้นที่",
+        workArea: "คียงาน"
+      };
+      return labels[field] || field;
+    }
+
+    function renderBarChart(targetSelector, items, options = {}) {
+      const limit = options.limit || 12;
+      const sorted = Object.entries(items)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+        .slice(0, limit);
+      const max = Math.max(1, ...sorted.map((item) => item[1]));
+
+      document.querySelector(targetSelector).innerHTML = sorted.length ? sorted.map(([label, value]) => {
+        const width = Math.max(4, Math.round((value / max) * 100));
+        return `
+          <div class="bar-row" title="${escapeAttribute(label)}">
+            <span>${escapeHtml(label)}</span>
+            <div class="bar-track"><div class="bar-fill ${options.fillClass || ""}" style="width:${width}%"></div></div>
+            <strong>${value}</strong>
+          </div>
+        `;
+      }).join("") : `<div class="empty">ยังไม่มีข้อมูลสำหรับแสดงกราฟ</div>`;
+    }
+
+    function renderProvinceMap(sourceRecords = records) {
+      const counts = countByField("province", sourceRecords);
+      const defaultProvinceNames = ["ฉะเชิงเทรา", "ปราจีนบุรี", "สระแก้ว", "ชลบุรี", "ระยอง", "จันทบุรี", "ตราด"];
+      const provinceSlots = [
+        { x: 35, y: 42, w: 220, h: 84, color: "#dbeafe" },
+        { x: 255, y: 42, w: 215, h: 84, color: "#fee2e2" },
+        { x: 470, y: 48, w: 190, h: 78, color: "#fef3c7" },
+        { x: 80, y: 128, w: 205, h: 102, color: "#b7e4c7" },
+        { x: 275, y: 224, w: 210, h: 92, color: "#a8dadc" },
+        { x: 430, y: 142, w: 200, h: 104, color: "#ffd6a5" },
+        { x: 575, y: 252, w: 155, h: 110, color: "#cdb4db" },
+        { x: 40, y: 250, w: 195, h: 82, color: "#dcfce7" },
+        { x: 510, y: 18, w: 185, h: 72, color: "#ede9fe" },
+        { x: 245, y: 330, w: 230, h: 72, color: "#ffedd5" }
+      ];
+      const provinceRows = [
+        ...defaultProvinceNames.map((name) => [name, counts[name] || 0]),
+        ...Object.entries(counts)
+          .filter(([name]) => name !== "(ว่าง)" && !defaultProvinceNames.includes(name))
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+      ].slice(0, provinceSlots.length);
+
+      const extraProvinces = Object.entries(counts)
+        .filter(([name]) => name !== "(ว่าง)" && !defaultProvinceNames.includes(name))
+        .sort((a, b) => b[1] - a[1]);
+
+      $("#provinceMap").innerHTML = `
+        <svg class="province-map" viewBox="0 0 780 430" role="img" aria-label="แผนที่จำนวนงานตามจังหวัด">
+          <rect x="0" y="0" width="780" height="430" fill="transparent"></rect>
+          ${provinceRows.map(([name, count], index) => {
+            const province = provinceSlots[index];
+            return `
+              <g>
+                <rect class="map-region" x="${province.x}" y="${province.y}" width="${province.w}" height="${province.h}" rx="22" fill="${province.color}"></rect>
+                <text class="map-label" x="${province.x + 22}" y="${province.y + 36}">${escapeHtml(truncateLabel(name, 16))}</text>
+                <text class="map-count" x="${province.x + 22}" y="${province.y + 76}">${count}</text>
+              </g>
+            `;
+          }).join("")}
+          <path d="M90 330 C190 390, 360 390, 470 330 S665 385, 735 320" fill="none" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".55"></path>
+        </svg>
+      `;
+
+      const listItems = [
+        ...defaultProvinceNames.map((name) => [name, counts[name] || 0]),
+        ...extraProvinces
+      ].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
+
+      $("#provinceMapList").innerHTML = listItems.length ? listItems.map(([name, count]) => `
+        <div class="map-list-item">
+          <span>${escapeHtml(name)}</span>
+          <strong>${count}</strong>
+        </div>
+      `).join("") : `<div class="empty">ยังไม่มีข้อมูลจังหวัด</div>`;
+
+      renderLocationList("#subDistrictMapList", countByField("subDistrict", sourceRecords), 10);
+      renderLocationList("#districtMapList", countByField("district", sourceRecords), 10);
+      renderLocationList("#provinceAreaMapList", counts, 10);
+      renderAreaCardMap("#subDistrictMap", countByField("subDistrict", sourceRecords), "แผนที่จำนวนงานตามตำบล");
+      renderAreaCardMap("#districtMap", countByField("district", sourceRecords), "แผนที่จำนวนงานตามอำเภอ");
+    }
+
+    function renderAreaCardMap(targetSelector, items, title) {
+      const rows = Object.entries(items)
+        .filter(([name]) => name !== "(ว่าง)")
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+        .slice(0, 7);
+      const colors = ["#dbeafe", "#fee2e2", "#fef3c7", "#b7e4c7", "#ffd6a5", "#a8dadc", "#cdb4db"];
+      const slots = [
+        { x: 35, y: 35, w: 225, h: 86 },
+        { x: 260, y: 36, w: 220, h: 80 },
+        { x: 478, y: 43, w: 190, h: 76 },
+        { x: 65, y: 120, w: 205, h: 95 },
+        { x: 408, y: 128, w: 200, h: 92 },
+        { x: 250, y: 210, w: 210, h: 86 },
+        { x: 540, y: 230, w: 155, h: 105 }
+      ];
+
+      document.querySelector(targetSelector).innerHTML = `
+        <svg class="area-card-map" viewBox="0 0 730 350" role="img" aria-label="${escapeAttribute(title)}">
+          <rect x="0" y="0" width="730" height="350" fill="transparent"></rect>
+          ${rows.map(([name, count], index) => {
+            const slot = slots[index];
+            return `
+              <g>
+                <rect class="map-region" x="${slot.x}" y="${slot.y}" width="${slot.w}" height="${slot.h}" rx="22" fill="${colors[index]}"></rect>
+                <text class="mini-map-label" x="${slot.x + 24}" y="${slot.y + 36}">${escapeHtml(truncateLabel(name, 18))}</text>
+                <text class="mini-map-count" x="${slot.x + 24}" y="${slot.y + 68}">${count}</text>
+              </g>
+            `;
+          }).join("")}
+          <path d="M30 295 C135 345, 315 345, 430 300 S585 320, 700 280" fill="none" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".55"></path>
+        </svg>
+      `;
+    }
+
+    function renderRegionMap(sourceRecords = records) {
+      const counts = countByRegionAuto(sourceRecords);
+      const regionSlots = [
+        { name: "ภาคเหนือ", x: 75, y: 35, w: 230, h: 92, color: "#dbeafe" },
+        { name: "ภาคตะวันออกเฉียงเหนือ", x: 345, y: 55, w: 285, h: 96, color: "#fef3c7" },
+        { name: "ภาคกลาง", x: 180, y: 150, w: 220, h: 88, color: "#fee2e2" },
+        { name: "ภาคตะวันออก", x: 410, y: 195, w: 230, h: 95, color: "#b7e4c7" },
+        { name: "ภาคตะวันตก", x: 72, y: 240, w: 215, h: 84, color: "#a8dadc" },
+        { name: "ภาคใต้", x: 300, y: 300, w: 205, h: 86, color: "#cdb4db" }
+      ];
+      const knownRegionNames = regionSlots.map((region) => region.name);
+      const extraRegions = Object.entries(counts)
+        .filter(([name]) => name !== "(ว่าง)" && !knownRegionNames.includes(name))
+        .sort((a, b) => b[1] - a[1]);
+      const rows = [
+        ...regionSlots.map((region) => [region.name, counts[region.name] || 0]),
+        ...extraRegions
+      ];
+
+      $("#regionMap").innerHTML = `
+        <svg class="province-map" viewBox="0 0 730 430" role="img" aria-label="แผนที่จำนวนงานตามภาค">
+          <rect x="0" y="0" width="730" height="430" fill="transparent"></rect>
+          ${regionSlots.map((region) => `
+            <g>
+              <rect class="map-region" x="${region.x}" y="${region.y}" width="${region.w}" height="${region.h}" rx="24" fill="${region.color}"></rect>
+              <text class="map-label" x="${region.x + 24}" y="${region.y + 40}">${region.name}</text>
+              <text class="map-count" x="${region.x + 24}" y="${region.y + 74}">${counts[region.name] || 0}</text>
+            </g>
+          `).join("")}
+          <path d="M80 365 C190 405, 330 390, 430 360 S575 375, 655 340" fill="none" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".55"></path>
+        </svg>
+      `;
+
+      $("#regionMapList").innerHTML = rows
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+        .map(([name, count]) => `
+          <div class="map-list-item">
+            <span>${escapeHtml(name)}</span>
+            <strong>${count}</strong>
+          </div>
+        `).join("");
+    }
+
+    function truncateLabel(value, maxLength) {
+      const text = String(value || "");
+      return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+    }
+
+    function renderLocationList(targetSelector, items, limit) {
+      const rows = Object.entries(items)
+        .filter(([name]) => name !== "(ว่าง)")
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+        .slice(0, limit);
+
+      document.querySelector(targetSelector).innerHTML = rows.length ? rows.map(([name, count]) => `
+        <div class="map-list-item">
+          <span>${escapeHtml(name)}</span>
+          <strong>${count}</strong>
+        </div>
+      `).join("") : `<div class="empty">ยังไม่มีข้อมูล</div>`;
+    }
+
+    function filteredHistory() {
+      const keyword = $("#historySearchInput").value.trim().toLowerCase();
+      const action = $("#historyActionFilter").value;
+      const user = $("#historyUserFilter").value.trim().toLowerCase();
+
+      return historyRecords.filter((item) => {
+        const text = [
+          item.timestamp,
+          item.action,
+          item.user,
+          item.customerName,
+          item.trueId,
+          item.summary
+        ].join(" ").toLowerCase();
+        const matchKeyword = !keyword || text.includes(keyword);
+        const matchAction = !action || item.action === action;
+        const matchUser = !user || String(item.user || "").toLowerCase().includes(user);
+        return matchKeyword && matchAction && matchUser;
+      });
+    }
+
+    function buildLocalDashboardSummary(sourceRecords = records) {
+      const installs = installTargets.reduce((acc, target) => {
+        const total = sourceRecords.filter((record) => recordContains(record, target.code)).length;
+        const completed = sourceRecords.filter((record) => {
+          const text = recordText(record);
+          return text.includes(`Completed${target.code}`) || (text.includes(target.code) && (record.operationStatus === "confirmed" || record.operationStatus === `Completed${target.code}`));
+        }).length;
+        acc[target.key] = {
+          total,
+          completed,
+          pending: Math.max(total - completed, 0)
+        };
+        return acc;
+      }, {});
+
+      const areas = areaTargets.reduce((acc, target) => {
+        acc[target.key] = sourceRecords.filter((record) => matchesAreaTarget(record, target)).length;
+        return acc;
+      }, {});
+
+      return { installs, areas };
+    }
+
+    function matchesAreaTarget(record, target) {
+      if (target.text) {
+        return String(`${record.ownArea || ""} ${record.workArea || ""} ${record.notes || ""}`).includes(target.text);
+      }
+      if (target.filters) {
+        return Object.entries(target.filters).every(([field, value]) => String(record[field] || "").trim() === value);
+      }
+      return false;
+    }
+
+    function recordText(record) {
+      return fields.map((field) => record[field] || "").join(" ");
+    }
+
+    function recordContains(record, text) {
+      return recordText(record).includes(text);
+    }
+
+    function renderDashboard() {
+      const sourceRecords = dashboardRecords();
+      const summary = buildLocalDashboardSummary(sourceRecords);
+      const installValues = installTargets.map((target) => summary.installs[target.key] || { total: 0, completed: 0, pending: 0 });
+      const totalInstall = installValues.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const totalCompleted = installValues.reduce((sum, item) => sum + Number(item.completed || 0), 0);
+      const totalPending = installValues.reduce((sum, item) => sum + Number(item.pending || 0), 0);
+
+      $("#totalInstallCount").textContent = totalInstall;
+      $("#completedInstallCount").textContent = totalCompleted;
+      $("#pendingInstallCount").textContent = totalPending;
+
+      $("#installSummary").innerHTML = installTargets.map((target) => {
+        const item = summary.installs[target.key] || { total: 0, completed: 0, pending: 0 };
+        const percent = item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0;
+        return `
+          <div class="install-card">
+            <h4>${target.label}</h4>
+            <div class="metric-line"><span>ยอดทั้งหมด</span><strong>${item.total || 0}</strong></div>
+            <div class="metric-line"><span>ติดตั้งเรียบร้อย</span><strong>${item.completed || 0}</strong></div>
+            <div class="metric-line"><span>รอติดตั้ง</span><strong>${item.pending || 0}</strong></div>
+            <div class="bar-track" aria-label="เปอร์เซ็นต์ติดตั้ง"><div class="bar-fill" style="width:${percent}%"></div></div>
+          </div>
+        `;
+      }).join("");
+
+      const installChartItems = installTargets.reduce((acc, target) => {
+        const item = summary.installs[target.key] || { total: 0, completed: 0, pending: 0 };
+        acc[`${target.label} ติดตั้งเรียบร้อย`] = Number(item.completed || 0);
+        acc[`${target.label} รอติดตั้ง`] = Number(item.pending || 0);
+        return acc;
+      }, {});
+      renderBarChart("#installChart", installChartItems, { limit: 10 });
+
+      $("#areaSummary").innerHTML = areaTargets.map((target) => `
+        <div class="area-item">
+          <div class="area-item-copy">
+            <span>${target.label}</span>
+            ${target.description ? `<small>${target.description}</small>` : ""}
+          </div>
+          <strong>${(summary.areas || {})[target.key] || 0}</strong>
+        </div>
+      `).join("");
+
+      renderBarChart("#subDistrictChart", countByField("subDistrict", sourceRecords), { limit: 15 });
+      renderBarChart("#districtChart", countByField("district", sourceRecords), { limit: 15 });
+      renderBarChart("#provinceChart", countByField("province", sourceRecords), { limit: 15 });
+      renderBarChart("#autoAreaChart", countCombinedFields(["region", "ownArea", "workArea"], sourceRecords), { limit: 18 });
+      renderBarChart("#cell39Chart", withoutEmptyBucket(countByField("cell39", sourceRecords)), { limit: 30 });
+      renderProvinceMap(sourceRecords);
+      renderRegionMap(sourceRecords);
+    }
+
+    function renderTable() {
+      const rows = filteredRecords();
+      const duplicateLookup = buildDuplicateLookup(records);
+      $("#emptyState").hidden = rows.length > 0;
+      renderColumnFilterButtons();
+      $("#recordsBody").innerHTML = rows.map((record) => `
+        <tr>
+          <td>
+            <div class="row-actions">
+              <button class="icon-btn" type="button" title="แก้ไข" data-edit="${record.id}">✎</button>
+              <button class="icon-btn delete" type="button" title="ลบ" data-delete="${record.id}">×</button>
+            </div>
+          </td>
+          <td>${displayValue(record.adminName)}</td>
+          <td>${displayValue(record.salesName)}</td>
+          <td>${displayValue(normalizePhone(record.salesmanContact))}</td>
+          <td${duplicateCellAttrs(record, "hiNumber", duplicateLookup)}>${displayValue(record.hiNumber)}</td>
+          <td${duplicateCellAttrs(record, "trueId", duplicateLookup)}>${displayValue(record.trueId)}</td>
+          <td${duplicateCellAttrs(record, "customerName", duplicateLookup)}>${displayValue(record.customerName)}</td>
+          <td${duplicateCellAttrs(record, "customerContact", duplicateLookup)}>${displayValue(normalizePhone(record.customerContact))}</td>
+          <td>${displayValue(formatDate(record.woCreateTime))}</td>
+          <td>${displayValue(formatDate(record.confirmedTime))}</td>
+          <td>${displayValue(formatDate(record.appointmentDate))}</td>
+          <td>${displayValue(record.promotion)}</td>
+          <td><span class="pill ${statusPillClass(record.salesOrg)}">${displayValue(record.salesOrg)}</span></td>
+          <td><span class="pill ${statusPillClass(record.callVer)}">${displayValue(record.callVer)}</span></td>
+          <td><span class="pill ${statusPillClass(record.operationStatus)}">${displayValue(statusText[record.operationStatus] || record.operationStatus)}</span></td>
+          <td>${displayValue(record.cell39)}</td>
+          <td>${displayValue(record.subDistrict)}</td>
+          <td>${displayValue(record.district)}</td>
+          <td>${displayValue(record.province)}</td>
+          <td>${displayValue(record.subcontractorName)}</td>
+          <td>${displayValue(record.region)}</td>
+          <td>${displayValue(record.ownArea)}</td>
+          <td>${displayValue(record.workArea)}</td>
+          <td>${displayValue(formatDate(record.installDueDate))}</td>
+          <td>${displayValue(record.paymentStatus)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderHistory() {
+      const actionText = {
+        create: "เพิ่มข้อมูล",
+        update: "แก้ไขข้อมูล",
+        delete: "ลบข้อมูล"
+      };
+      const rows = filteredHistory();
+      $("#historyEmptyState").hidden = rows.length > 0;
+      $("#historyBody").innerHTML = rows.map((item) => `
+        <tr>
+          <td>${displayValue(formatDate(item.timestamp))}</td>
+          <td><span class="pill ${item.action === "delete" ? "cancelled" : item.action === "update" ? "pending" : "confirmed"}">${displayValue(actionText[item.action] || item.action)}</span></td>
+          <td>${displayValue(item.user)}</td>
+          <td>${displayValue(item.customerName)}</td>
+          <td>${displayValue(item.trueId)}</td>
+          <td>${displayValue(item.summary)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderAll() {
+      saveRecords();
+      renderManagedNamePickers();
+      renderDashboard();
+      renderTable();
+      renderHistory();
+    }
+
+    function exportCsv() {
+      const headers = [
+        "แอดมิน", "ชื่อเซลล์", "Saleman Contact", "HSI Number", "หมายเลข TRUE ID", "Customer Name",
+        "Customer Contact", "Wo Create Time", "Confirmed Time", "Appointment Date",
+        "โปรโมชั่น", "Sales Org", "Call ver", "Operation status", "เซลล์ 39", "ตำบล",
+        "อำเภอ", "จังหวัด", "Sub-contrator name", "ภาค", "ในพื้นที่ ตัวเอง",
+        "พื้นที่คียงาน", "กำหนดติดตั้ง", "ทำจ่าย", "หมายเหตุ"
+      ];
+      const csvRows = [headers, ...filteredRecords().map((record) => fields.map((field) => record[field] || ""))];
+      const csv = csvRows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "customer-records.csv";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    document.querySelectorAll(".nav button").forEach((button) => {
+      button.addEventListener("click", () => switchView(button.dataset.target));
+    });
+
+    $("#newRecordBtn").addEventListener("click", () => {
+      resetForm();
+      switchView("form");
+    });
+    $("#refreshDataBtn").addEventListener("click", loadFromSheet);
+
+    $("#clearBtn").addEventListener("click", resetForm);
+    $("#cancelEditBtn").addEventListener("click", resetForm);
+    $("#resetFilterBtn").addEventListener("click", () => {
+      $("#searchInput").value = "";
+      $("#salesOrgFilter").value = "";
+      $("#callVerFilter").value = "";
+      $("#statusFilter").value = "";
+      $("#provinceFilter").value = "";
+      setReportMonth("");
+      columnFilters = {};
+      closeColumnFilter();
+      renderTable();
+    });
+    $("#resetHistoryBtn").addEventListener("click", () => {
+      $("#historySearchInput").value = "";
+      $("#historyActionFilter").value = "";
+      $("#historyUserFilter").value = "";
+      renderHistory();
+    });
+    $("#exportBtn").addEventListener("click", exportCsv);
+    $("#resetDashboardMonthBtn").addEventListener("click", () => setReportMonth(""));
+    $("#settingsAccessBtn").addEventListener("click", unlockSettings);
+    $("#lockSettingsBtn").addEventListener("click", () => {
+      $("#settingsPanel").hidden = true;
+      setStatus("ซ่อนหน้าตั้งค่า Google Sheet แล้ว");
+    });
+    $("#refreshHistoryBtn").addEventListener("click", async () => {
+      if (!isAppsScriptWebApp) {
+        setStatus("ไฟล์นี้ต้องเปิดจาก Google Apps Script Web App เพื่อโหลดประวัติ", true);
+        return;
+      }
+      try {
+        const historyResult = await sheetRequest("history");
+        historyRecords = Array.isArray(historyResult.history) ? historyResult.history : [];
+        renderHistory();
+        setStatus(`โหลดประวัติ ${historyRecords.length} รายการแล้ว`);
+      } catch (error) {
+        setStatus(`โหลดประวัติไม่สำเร็จ: ${error.message}`, true);
+      }
+    });
+    $("#saveUrlBtn").addEventListener("click", () => {
+      loadFromSheet();
+    });
+    $("#syncBtn").addEventListener("click", loadFromSheet);
+
+    Object.keys(managedNameFields).forEach((field) => {
+      const input = document.getElementById(field);
+      const addInput = document.getElementById(`${field}New`);
+
+      if (input) {
+        input.addEventListener("input", () => renderManagedNameOptionList(field));
+        input.addEventListener("change", () => renderManagedNameOptionList(field));
+      }
+
+      if (addInput) {
+        addInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            addManagedNameOption(field, addInput.value || input?.value);
+          }
+        });
+      }
+    });
+
+    document.querySelectorAll("[data-add-name]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const field = button.dataset.addName;
+        const input = document.getElementById(field);
+        const addInput = document.getElementById(`${field}New`);
+        addManagedNameOption(field, addInput?.value || input?.value);
+      });
+    });
+
+    document.querySelectorAll("[data-name-picker]").forEach((picker) => {
+      picker.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-pick-name]");
+        if (!button) return;
+
+        const field = button.dataset.pickField;
+        const input = document.getElementById(field);
+        if (!input) return;
+
+        input.value = button.dataset.pickName;
+        renderManagedNameOptionList(field);
+      });
+    });
+
+    ["searchInput", "salesOrgFilter", "callVerFilter", "statusFilter", "provinceFilter"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", renderTable);
+      document.getElementById(id).addEventListener("change", renderTable);
+    });
+    ["monthFilter", "dashboardMonthFilter"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", (event) => setReportMonth(event.target.value));
+      document.getElementById(id).addEventListener("change", (event) => setReportMonth(event.target.value));
+    });
+    document.querySelectorAll(".filter-btn").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openColumnFilter(button);
+      });
+    });
+    $("#filterMenuSearch").addEventListener("input", renderColumnFilterOptions);
+    $("#filterMenuOptions").addEventListener("change", (event) => {
+      if (event.target.matches("input[type='checkbox']")) {
+        updateDraftColumnFilterValue(event.target.value, event.target.checked);
+      }
+    });
+    $("#uncheckAllColumnFilterBtn").addEventListener("click", uncheckAllColumnFilterOptions);
+    $("#applyColumnFilterBtn").addEventListener("click", applyColumnFilter);
+    $("#clearColumnFilterBtn").addEventListener("click", clearColumnFilter);
+    document.addEventListener("click", (event) => {
+      if (!$("#columnFilterMenu").hidden && !event.target.closest("#columnFilterMenu") && !event.target.closest(".filter-btn")) {
+        closeColumnFilter();
+      }
+    });
+    ["subDistrict", "district", "province", "salesOrg", "woCreateTime", "confirmedTime"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", calculateAutoFields);
+      document.getElementById(id).addEventListener("change", calculateAutoFields);
+    });
+    ["salesmanContact", "customerContact"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", (event) => {
+        event.target.value = event.target.value.replace(/\D/g, "").slice(0, 10);
+        checkDuplicateFields();
+      });
+      document.getElementById(id).addEventListener("blur", (event) => {
+        event.target.value = normalizePhone(event.target.value);
+        checkDuplicateFields();
+      });
+    });
+    ["hiNumber", "trueId", "customerName"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", checkDuplicateFields);
+      document.getElementById(id).addEventListener("change", checkDuplicateFields);
+    });
+    ["historySearchInput", "historyActionFilter", "historyUserFilter"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", renderHistory);
+      document.getElementById(id).addEventListener("change", renderHistory);
+    });
+
+    $("#recordForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const id = $("#recordId").value;
+      const data = getFormData();
+
+      try {
+        if (isAppsScriptWebApp) {
+          if (id) {
+            const result = await sheetRequest("update", { record: { id, ...data } });
+            records = records.map((record) => record.id === id ? result.record : record);
+            if (result.history) historyRecords.unshift(result.history);
+          } else {
+            const result = await sheetRequest("create", { record: data });
+            records.unshift(result.record);
+            if (result.history) historyRecords.unshift(result.history);
+          }
+          setStatus("บันทึกข้อมูลลง Google Sheet แล้ว");
+        } else if (id) {
+          records = records.map((record) => record.id === id ? { ...record, ...data } : record);
+          setStatus("บันทึกในเครื่องแล้ว เพราะยังไม่ได้ตั้งค่า Google Sheet");
+        } else {
+          records.unshift({ id: makeId(), ...data });
+          setStatus("บันทึกในเครื่องแล้ว เพราะยังไม่ได้ตั้งค่า Google Sheet");
+        }
+
+        rememberAdminName(data.adminName);
+        resetForm();
+        renderAll();
+        switchView("table");
+      } catch (error) {
+        setStatus(`บันทึกไม่สำเร็จ: ${error.message}`, true);
+      }
+    });
+
+    $("#recordsBody").addEventListener("click", async (event) => {
+      const editId = event.target.dataset.edit;
+      const deleteId = event.target.dataset.delete;
+
+      if (editId) {
+        const record = records.find((item) => item.id === editId);
+        if (record) fillForm(record);
+      }
+
+      if (deleteId && confirm("ต้องการลบรายการนี้ใช่ไหม?")) {
+        try {
+          if (isAppsScriptWebApp) {
+            await sheetRequest("delete", { id: deleteId });
+            const historyResult = await sheetRequest("history");
+            historyRecords = Array.isArray(historyResult.history) ? historyResult.history : historyRecords;
+            setStatus("ลบข้อมูลจาก Google Sheet แล้ว");
+          }
+          records = records.filter((item) => item.id !== deleteId);
+          renderAll();
+        } catch (error) {
+          setStatus(`ลบไม่สำเร็จ: ${error.message}`, true);
+        }
+      }
+    });
+
+    $("#scriptUrl").value = isAppsScriptWebApp ? gasModeLabel : "โหมดตัวอย่างในเครื่อง";
+    $("#cancelEditBtn").style.display = "none";
+    syncReportMonthInputs();
+    renderAll();
+    applyRememberedAdminName();
+    loadFromSheet();
+  </script>
+</body>
+</html>
