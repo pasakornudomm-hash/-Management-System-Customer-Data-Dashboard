@@ -1544,6 +1544,10 @@
     let activeFilterValues = [];
     let cacheWriteHandle = 0;
     let activeLoadPromise = null;
+    let historyLoadPromise = null;
+    let historyLoaded = false;
+    let activeView = "dashboard";
+    const dirtyViews = new Set(["dashboard", "table", "history"]);
     let isSubmittingRecord = false;
     let tableRenderToken = 0;
     let historyRenderToken = 0;
@@ -1577,6 +1581,9 @@
     function markRecordsChanged() {
       duplicateLookupCache = null;
       searchTextCache = new WeakMap();
+      dirtyViews.add("dashboard");
+      dirtyViews.add("table");
+      dirtyViews.add("history");
       saveRecords();
     }
 
@@ -1933,23 +1940,12 @@
       setStatus("กำลังโหลดข้อมูลจาก Google Sheet...");
       activeLoadPromise = (async () => {
         try {
-          const [listResult, historyResult] = await Promise.allSettled([
-            sheetRequest("list", {}, { force: true }),
-            sheetRequest("history", {}, { force: true })
-          ]);
-
-          if (listResult.status === "rejected") throw listResult.reason;
-          records = Array.isArray(listResult.value.records) ? listResult.value.records : [];
-          if (historyResult.status === "fulfilled") {
-            historyRecords = Array.isArray(historyResult.value.history) ? historyResult.value.history : [];
-          } else {
-            console.warn(historyResult.reason);
-          }
+          const listResult = await sheetRequest("list", {}, { force: true });
+          records = Array.isArray(listResult.records) ? listResult.records : [];
           dashboardSummary = null;
           markRecordsChanged();
           renderAll({ persist: false });
-          const historyNote = historyResult.status === "rejected" ? " (ประวัติจะโหลดใหม่เมื่อเปิดหน้า)" : "";
-          setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ${historyNote}`);
+          setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ`);
         } catch (error) {
           setStatus(`เชื่อมต่อไม่สำเร็จ: ${error.message}`, true);
         } finally {
@@ -1962,6 +1958,7 @@
     }
 
     function switchView(target) {
+      activeView = target;
       document.querySelectorAll(".nav button").forEach((button) => {
         button.classList.toggle("active", button.dataset.target === target);
       });
@@ -1973,7 +1970,25 @@
         $("#pageTitle").textContent = activeButton.dataset.title;
         $("#pageDescription").textContent = activeButton.dataset.description;
       }
+      renderActiveView();
+      if (target === "history" && !historyLoaded) loadHistoryOnDemand();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function loadHistoryOnDemand() {
+      if (historyLoaded || historyLoadPromise || !isAppsScriptWebApp) return historyLoadPromise;
+      historyLoadPromise = sheetRequest("history")
+        .then((result) => {
+          historyRecords = Array.isArray(result.history) ? result.history : [];
+          historyLoaded = true;
+          dirtyViews.add("history");
+          if (activeView === "history") renderActiveView();
+        })
+        .catch((error) => setStatus(`โหลดประวัติไม่สำเร็จ: ${error.message}`, true))
+        .finally(() => {
+          historyLoadPromise = null;
+        });
+      return historyLoadPromise;
     }
 
     function resetForm() {
@@ -2549,24 +2564,29 @@
     }
 
     function buildLocalDashboardSummary(sourceRecords = records) {
-      const installs = installTargets.reduce((acc, target) => {
-        const total = sourceRecords.filter((record) => recordContains(record, target.code)).length;
-        const completed = sourceRecords.filter((record) => {
-          const text = recordText(record);
-          return text.includes(`Completed${target.code}`) || (text.includes(target.code) && (record.operationStatus === "confirmed" || record.operationStatus === `Completed${target.code}`));
-        }).length;
-        acc[target.key] = {
-          total,
-          completed,
-          pending: Math.max(total - completed, 0)
-        };
-        return acc;
-      }, {});
+      const installs = Object.fromEntries(installTargets.map((target) => [
+        target.key,
+        { total: 0, completed: 0, pending: 0 }
+      ]));
+      const areas = Object.fromEntries(areaTargets.map((target) => [target.key, 0]));
 
-      const areas = areaTargets.reduce((acc, target) => {
-        acc[target.key] = sourceRecords.filter((record) => matchesAreaTarget(record, target)).length;
-        return acc;
-      }, {});
+      sourceRecords.forEach((record) => {
+        const text = recordText(record);
+        installTargets.forEach((target) => {
+          if (!text.includes(target.code)) return;
+          installs[target.key].total += 1;
+          if (text.includes(`Completed${target.code}`) || record.operationStatus === "confirmed" || record.operationStatus === `Completed${target.code}`) {
+            installs[target.key].completed += 1;
+          }
+        });
+        areaTargets.forEach((target) => {
+          if (matchesAreaTarget(record, target)) areas[target.key] += 1;
+        });
+      });
+
+      Object.values(installs).forEach((item) => {
+        item.pending = Math.max(item.total - item.completed, 0);
+      });
 
       return { installs, areas };
     }
@@ -2753,12 +2773,18 @@
       appendChunk();
     }
 
+    function renderActiveView() {
+      if (!dirtyViews.has(activeView)) return;
+      if (activeView === "dashboard") renderDashboard();
+      if (activeView === "table") renderTable();
+      if (activeView === "history") renderHistory();
+      dirtyViews.delete(activeView);
+    }
+
     function renderAll(options = {}) {
       if (options.persist !== false) markRecordsChanged();
       renderManagedNamePickers();
-      renderDashboard();
-      renderTable();
-      renderHistory();
+      renderActiveView();
     }
 
     function exportCsv() {
@@ -2826,6 +2852,8 @@
       try {
         const historyResult = await sheetRequest("history", {}, { force: true });
         historyRecords = Array.isArray(historyResult.history) ? historyResult.history : [];
+        historyLoaded = true;
+        dirtyViews.add("history");
         renderHistory();
         setStatus(`โหลดประวัติ ${historyRecords.length} รายการแล้ว`);
       } catch (error) {
@@ -2991,7 +3019,9 @@
       try {
         const historyResult = await sheetRequest("history", {}, { force: true });
         historyRecords = Array.isArray(historyResult.history) ? historyResult.history : historyRecords;
-        renderHistory();
+        historyLoaded = true;
+        dirtyViews.add("history");
+        if (activeView === "history") renderActiveView();
       } catch (error) {
         console.warn("โหลดประวัติหลังแก้ไขข้อมูลไม่สำเร็จ", error);
       }
