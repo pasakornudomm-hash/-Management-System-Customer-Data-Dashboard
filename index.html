@@ -1224,9 +1224,9 @@
               </select>
             </label>
             <label>เซลล์ 39
-              <select id="cell39" required>
-                <option value="">เลือกเซลล์ 39</option>
-              </select>
+              <input id="cell39" list="cell39Options" placeholder="เว้นว่างได้ หรือพิมพ์ชื่อใหม่">
+              <datalist id="cell39Options"></datalist>
+              <small class="name-list-note">เว้นว่างได้ หรือพิมพ์ชื่อใหม่แล้วบันทึก</small>
             </label>
             <label>ตำบล
               <input id="subDistrict" placeholder="ตำบล">
@@ -2038,7 +2038,11 @@
       if (!key) return "";
       const options = getCell39OptionValues();
       if (options.includes(cleaned)) return cleaned;
-      return options.find((candidate) => cell39ComparisonKey(candidate) === key) || "";
+      const matchingOption = options.find((candidate) => cell39ComparisonKey(candidate) === key);
+      if (matchingOption) return matchingOption;
+      if (/^นาย\s*/.test(cleaned)) return cleaned.replace(/^นาย\s*/, "นาย ");
+      if (/^นางสาว\s*/.test(cleaned)) return cleaned.replace(/^นางสาว\s*/, "นางสาว ");
+      return cleaned;
     }
 
     function getCell39OptionValues() {
@@ -2074,20 +2078,16 @@
     }
 
     function renderCell39Options() {
-      const select = $("#cell39");
-      const selectedValue = canonicalizeCell39(select.value);
-      select.replaceChildren();
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = "เลือกเซลล์ 39";
-      select.appendChild(placeholder);
+      const input = $("#cell39");
+      const datalist = $("#cell39Options");
+      const selectedValue = canonicalizeCell39(input.value);
+      datalist.replaceChildren();
       getCell39OptionValues().forEach((value) => {
         const option = document.createElement("option");
         option.value = value;
-        option.textContent = value;
-        select.appendChild(option);
+        datalist.appendChild(option);
       });
-      select.value = selectedValue;
+      input.value = selectedValue;
     }
 
     function fillForm(record) {
@@ -3029,6 +3029,9 @@
     ["subDistrict", "district", "province", "salesOrg", "woCreateTime", "confirmedTime"].forEach((id) => {
       document.getElementById(id).addEventListener("input", calculateAutoFields);
       document.getElementById(id).addEventListener("change", calculateAutoFields);
+    });
+    $("#cell39").addEventListener("blur", (event) => {
+      event.target.value = canonicalizeCell39(event.target.value);
     });
     ["salesmanContact", "customerContact"].forEach((id) => {
       document.getElementById(id).addEventListener("input", (event) => {
