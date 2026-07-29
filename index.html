@@ -1397,6 +1397,10 @@
     const adminNameMemoryKey = "blue-customer-records-admin-name-v1";
     const reportMonthKey = "blue-customer-records-report-month-v1";
     const gasModeLabel = "ใช้ Web App นี้เชื่อมต่ออัตโนมัติ";
+    const CELL39_EXTRA_NAMES = [
+      "น.ส.วิชชุดา แก้วมาลา",
+      "นาย กรวิชญ์ ตรีเนตร"
+    ];
     const fields = [
       "adminName", "salesName", "salesmanContact", "hiNumber", "trueId", "customerName",
       "customerContact", "woCreateTime", "confirmedTime", "appointmentDate",
@@ -2038,15 +2042,16 @@
     }
 
     function getCell39OptionValues() {
-      const sourceValues = cell39OptionsFromApi.length
+      const dynamicValues = cell39OptionsFromApi.length
         ? cell39OptionsFromApi
         : records.map((record) => record.cell39);
+      const sourceValues = [...dynamicValues, ...CELL39_EXTRA_NAMES];
       const groups = new Map();
 
       sourceValues.forEach((rawValue) => {
         const value = String(rawValue || "").trim().replace(/\s+/g, " ");
         const key = cell39ComparisonKey(value);
-        if (!key) return;
+        if (!key || /^100/.test(value)) return;
         if (!groups.has(key)) groups.set(key, new Map());
         const variants = groups.get(key);
         variants.set(value, (variants.get(value) || 0) + 1);
