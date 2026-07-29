@@ -1039,7 +1039,7 @@
             <button class="ghost-btn" type="button" id="saveUrlBtn">โหลดข้อมูลใหม่</button>
             <button class="primary-btn" type="button" id="syncBtn">ซิงก์ข้อมูล</button>
           </div>
-          <div class="connection-status" id="connectionStatus">พร้อมเชื่อมต่อ Google Sheet ผ่าน Web App นี้</div>
+          <div class="connection-status" id="connectionStatus" role="status" aria-live="polite">พร้อมเชื่อมต่อ Google Sheet ผ่าน Web App นี้</div>
           <div class="settings-names">
             <div class="field-group">
               <span>เพิ่มชื่อเซลล์</span>
@@ -1224,7 +1224,9 @@
               </select>
             </label>
             <label>เซลล์ 39
-              <input id="cell39" placeholder="เซลล์ 39">
+              <select id="cell39" required>
+                <option value="">เลือกเซลล์ 39</option>
+              </select>
             </label>
             <label>ตำบล
               <input id="subDistrict" placeholder="ตำบล">
@@ -1539,6 +1541,7 @@
     let reportMonth = localStorage.getItem(reportMonthKey) || "";
     let dashboardSummary = null;
     let historyRecords = [];
+    let cell39OptionsFromApi = [];
     let columnFilters = {};
     let activeFilterField = "";
     let activeFilterValues = [];
@@ -1942,8 +1945,10 @@
         try {
           const listResult = await sheetRequest("list", {}, { force: true });
           records = Array.isArray(listResult.records) ? listResult.records : [];
+          cell39OptionsFromApi = Array.isArray(listResult.cell39Options) ? listResult.cell39Options : [];
           dashboardSummary = null;
           markRecordsChanged();
+          renderCell39Options();
           renderAll({ persist: false });
           setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ`);
         } catch (error) {
@@ -2009,14 +2014,85 @@
       });
       data.salesmanContact = normalizePhone(data.salesmanContact);
       data.customerContact = normalizePhone(data.customerContact);
+      data.cell39 = canonicalizeCell39(data.cell39);
+      $("#cell39").value = data.cell39;
       return data;
+    }
+
+    function cell39ComparisonKey(value) {
+      return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/^นาย\s*/, "นาย")
+        .replace(/^นางสาว\s*/, "นางสาว")
+        .replace(/^น\.ส\.\s*/, "น.ส.");
+    }
+
+    function canonicalizeCell39(value) {
+      const cleaned = String(value || "").trim().replace(/\s+/g, " ");
+      const key = cell39ComparisonKey(cleaned);
+      if (!key) return "";
+      const options = getCell39OptionValues();
+      if (options.includes(cleaned)) return cleaned;
+      return options.find((candidate) => cell39ComparisonKey(candidate) === key) || "";
+    }
+
+    function getCell39OptionValues() {
+      const sourceValues = cell39OptionsFromApi.length
+        ? cell39OptionsFromApi
+        : records.map((record) => record.cell39);
+      const groups = new Map();
+
+      sourceValues.forEach((rawValue) => {
+        const value = String(rawValue || "").trim().replace(/\s+/g, " ");
+        const key = cell39ComparisonKey(value);
+        if (!key) return;
+        if (!groups.has(key)) groups.set(key, new Map());
+        const variants = groups.get(key);
+        variants.set(value, (variants.get(value) || 0) + 1);
+      });
+
+      const values = [];
+      groups.forEach((variants) => {
+        const candidates = [...variants.entries()];
+        candidates.sort((left, right) => {
+          if (right[1] !== left[1]) return right[1] - left[1];
+          const leftHasTitleSpace = /^(นาย|นางสาว|น\.ส\.)\s/.test(left[0]);
+          const rightHasTitleSpace = /^(นาย|นางสาว|น\.ส\.)\s/.test(right[0]);
+          if (leftHasTitleSpace !== rightHasTitleSpace) return rightHasTitleSpace - leftHasTitleSpace;
+          return left[0].localeCompare(right[0], "th");
+        });
+        values.push(candidates[0][0]);
+      });
+
+      return values.sort((left, right) => left.localeCompare(right, "th", { numeric: true }));
+    }
+
+    function renderCell39Options() {
+      const select = $("#cell39");
+      const selectedValue = canonicalizeCell39(select.value);
+      select.replaceChildren();
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "เลือกเซลล์ 39";
+      select.appendChild(placeholder);
+      getCell39OptionValues().forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+      select.value = selectedValue;
     }
 
     function fillForm(record) {
       fields.forEach((field) => {
-        const value = field === "salesmanContact" || field === "customerContact"
-          ? normalizePhone(record[field])
-          : record[field] || "";
+        let value = record[field] || "";
+        if (field === "salesmanContact" || field === "customerContact") {
+          value = normalizePhone(value);
+        } else if (field === "cell39") {
+          value = canonicalizeCell39(value);
+        }
         document.getElementById(field).value = value;
       });
       $("#recordId").value = record.id;
@@ -2974,7 +3050,18 @@
       const form = $("#recordForm");
       const submitButton = form.querySelector("button[type='submit']");
       form.setAttribute("aria-busy", String(isSubmitting));
-      if (submitButton) submitButton.disabled = isSubmitting;
+      if (submitButton) {
+        submitButton.disabled = isSubmitting;
+        submitButton.textContent = isSubmitting ? "กำลังบันทึก..." : "บันทึกข้อมูล";
+      }
+    }
+
+    function friendlySaveError(error) {
+      const message = String((error && error.message) || error || "ไม่ทราบสาเหตุ");
+      if (message.includes("ละเมิดกฎการตรวจสอบข้อมูล") && /เซลล์ P\d+/i.test(message)) {
+        return "ค่า “เซลล์ 39” ไม่ตรงกับรายการที่ Google Sheet อนุญาต กรุณาตรวจชื่อและเว้นวรรคให้ตรงกับรายการ";
+      }
+      return message;
     }
 
     $("#recordForm").addEventListener("submit", async (event) => {
@@ -2983,6 +3070,7 @@
       setRecordSubmitting(true);
       const id = $("#recordId").value;
       const data = getFormData();
+      setStatus(id ? "กำลังบันทึกการแก้ไขลง Google Sheet..." : "กำลังบันทึกข้อมูลลง Google Sheet...");
 
       try {
         if (isAppsScriptWebApp) {
@@ -3009,7 +3097,7 @@
         renderAll();
         switchView("table");
       } catch (error) {
-        setStatus(`บันทึกไม่สำเร็จ: ${error.message}`, true);
+        setStatus(`บันทึกไม่สำเร็จ: ${friendlySaveError(error)}`, true);
       } finally {
         setRecordSubmitting(false);
       }
@@ -3060,6 +3148,7 @@
 
     $("#scriptUrl").value = isAppsScriptWebApp ? gasModeLabel : "โหมดตัวอย่างในเครื่อง";
     $("#cancelEditBtn").style.display = "none";
+    renderCell39Options();
     syncReportMonthInputs();
     renderAll();
     applyRememberedAdminName();
