@@ -254,6 +254,70 @@
       align-items: start;
     }
 
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(300px, .5fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .trend-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .trend-legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 5px;
+      border-radius: 999px;
+      background: var(--legend-color);
+    }
+
+    .trend-chart {
+      min-height: 280px;
+      overflow-x: auto;
+    }
+
+    .trend-chart svg {
+      display: block;
+      width: 100%;
+      min-width: 720px;
+      height: 280px;
+    }
+
+    .analytics-table {
+      width: 100%;
+      min-width: 860px;
+    }
+
+    .analytics-table th,
+    .analytics-table td {
+      text-align: center;
+    }
+
+    .analytics-table th:first-child,
+    .analytics-table td:first-child,
+    .analytics-table th:nth-child(2),
+    .analytics-table td:nth-child(2) {
+      text-align: left;
+    }
+
+    .kpi-score {
+      font-weight: 800;
+      color: var(--blue-800);
+    }
+
+    .kpi-good { color: var(--green); }
+    .kpi-watch { color: var(--orange); }
+    .kpi-risk { color: var(--red); }
+
     .install-cards {
       display: grid;
       grid-template-columns: repeat(5, minmax(160px, 1fr));
@@ -1027,6 +1091,53 @@
           </div>
         </div>
 
+        <div class="analytics-grid">
+          <div class="panel">
+            <div class="section-title">
+              <h3>แนวโน้มงานรายวัน</h3>
+            </div>
+            <div class="table-hint">เปรียบเทียบวันที่สร้าง WO, วันนัดติดตั้ง และวันที่คีย์เข้าระบบจากประวัติการเพิ่มข้อมูล</div>
+            <div class="trend-legend">
+              <span style="--legend-color:#1769d1">Wo Create Time</span>
+              <span style="--legend-color:#f59e0b">Appointment Date</span>
+              <span style="--legend-color:#16a34a">คีย์เข้าระบบ</span>
+            </div>
+            <div class="trend-chart" id="dailyTrendChart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title">
+              <h3>สรุปช่วงเวลาที่เลือก</h3>
+            </div>
+            <div class="area-grid" id="dailyTrendSummary"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title">
+            <h3>รายละเอียดรายวัน</h3>
+          </div>
+          <div class="table-hint">เรียงจากวันล่าสุด แสดงครบทุกวันที่มีรายการ</div>
+          <div class="table-wrap">
+            <table class="analytics-table">
+              <thead><tr><th>วันที่</th><th>วัน</th><th>สร้าง WO</th><th>วันนัด</th><th>คีย์เข้าระบบ</th><th>Completed</th><th>Scheduled</th><th>Cancelled</th><th>Rejected</th></tr></thead>
+              <tbody id="dailyTrendBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title">
+            <h3>KPI แยกตามชื่อเซลล์</h3>
+          </div>
+          <div class="table-hint">สรุปทุกคน ทุกสถานะ พร้อมอัตรางาน Completed เรียงตามจำนวนงานสูงสุด</div>
+          <div class="table-wrap">
+            <table class="analytics-table" id="salesKpiTable">
+              <thead id="salesKpiHead"></thead>
+              <tbody id="salesKpiBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="panel settings-panel" id="settingsPanel" hidden>
           <div class="section-title">
             <h3>เครื่องมือข้อมูล</h3>
@@ -1564,6 +1675,7 @@
     const pendingApiRequests = new Map();
     const apiResponseCache = new Map();
     const pendingDeletes = new Set();
+    const createRequiredInputs = [...document.querySelectorAll("#recordForm [required]")];
 
     const $ = (selector) => document.querySelector(selector);
 
@@ -1955,6 +2067,7 @@
           renderCell39Options();
           renderAll({ persist: false });
           setStatus(`เชื่อมต่อ Google Sheet แล้ว โหลดข้อมูล ${records.length} รายการ`);
+          loadHistoryOnDemand();
         } catch (error) {
           setStatus(`เชื่อมต่อไม่สำเร็จ: ${error.message}`, true);
         } finally {
@@ -1991,7 +2104,9 @@
           historyRecords = Array.isArray(result.history) ? result.history : [];
           historyLoaded = true;
           dirtyViews.add("history");
+          dirtyViews.add("dashboard");
           if (activeView === "history") renderActiveView();
+          if (activeView === "dashboard") renderDashboard();
         })
         .catch((error) => setStatus(`โหลดประวัติไม่สำเร็จ: ${error.message}`, true))
         .finally(() => {
@@ -2002,6 +2117,9 @@
 
     function resetForm() {
       $("#recordForm").reset();
+      createRequiredInputs.forEach((input) => {
+        input.required = true;
+      });
       $("#recordId").value = "";
       $("#formTitle").textContent = "คีย์ข้อมูลใหม่";
       $("#cancelEditBtn").style.display = "none";
@@ -2091,6 +2209,9 @@
     }
 
     function fillForm(record) {
+      createRequiredInputs.forEach((input) => {
+        input.required = false;
+      });
       fields.forEach((field) => {
         let value = record[field] || "";
         if (field === "salesmanContact" || field === "customerContact") {
@@ -2672,6 +2793,151 @@
       return { installs, areas };
     }
 
+    function dateKey(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+      const local = text.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);
+      if (local) {
+        let year = Number(local[3]);
+        if (year > 2400) year -= 543;
+        return `${year}-${local[2].padStart(2, "0")}-${local[1].padStart(2, "0")}`;
+      }
+      const parsed = new Date(text);
+      if (Number.isNaN(parsed.getTime())) return "";
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    }
+
+    function metricDateMatchesMonth(key) {
+      return !reportMonth || key.startsWith(reportMonth);
+    }
+
+    function buildDailyMetrics(sourceRecords = records) {
+      const days = new Map();
+      const ensure = (key) => {
+        if (!key || !metricDateMatchesMonth(key)) return null;
+        if (!days.has(key)) days.set(key, { wo: 0, appointment: 0, keyed: 0, statuses: {} });
+        return days.get(key);
+      };
+
+      sourceRecords.forEach((record) => {
+        const wo = ensure(dateKey(record.woCreateTime));
+        if (wo) wo.wo += 1;
+        const appointment = ensure(dateKey(record.appointmentDate));
+        if (appointment) {
+          appointment.appointment += 1;
+          const status = String(record.operationStatus || "(ว่าง)").trim() || "(ว่าง)";
+          appointment.statuses[status] = (appointment.statuses[status] || 0) + 1;
+        }
+      });
+
+      historyRecords.forEach((item) => {
+        if (item.action !== "create") return;
+        const day = ensure(dateKey(item.timestamp));
+        if (day) day.keyed += 1;
+      });
+      return [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    }
+
+    function renderDailyAnalytics(sourceRecords) {
+      const metrics = buildDailyMetrics(sourceRecords);
+      const visible = reportMonth ? metrics : metrics.slice(-31);
+      const totals = visible.reduce((acc, [, item]) => {
+        acc.wo += item.wo;
+        acc.appointment += item.appointment;
+        acc.keyed += item.keyed;
+        return acc;
+      }, { wo: 0, appointment: 0, keyed: 0 });
+      const peak = visible.reduce((best, current) => {
+        const total = current[1].wo + current[1].appointment + current[1].keyed;
+        return total > best.total ? { key: current[0], total } : best;
+      }, { key: "", total: 0 });
+
+      $("#dailyTrendSummary").innerHTML = [
+        ["สร้าง WO", totals.wo], ["วันนัดติดตั้ง", totals.appointment], ["คีย์เข้าระบบ", totals.keyed],
+        ["วันที่งานสูงสุด", peak.key ? formatDateKey(peak.key) : "-"]
+      ].map(([label, value]) => `<div class="area-item"><span>${label}</span><strong>${value}</strong></div>`).join("");
+
+      renderTrendSvg(visible);
+      const reversed = [...metrics].reverse();
+      $("#dailyTrendBody").innerHTML = reversed.length ? reversed.map(([key, item]) => `
+        <tr>
+          <td>${formatDateKey(key)}</td><td>${formatWeekday(key)}</td>
+          <td>${item.wo}</td><td>${item.appointment}</td><td>${item.keyed}</td>
+          <td>${completedStatusCount(item.statuses)}</td><td>${item.statuses.Scheduled || 0}</td>
+          <td>${item.statuses.Cancelled || 0}</td><td>${item.statuses.Rejected || 0}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="9" class="empty">ยังไม่มีข้อมูลรายวัน</td></tr>`;
+    }
+
+    function renderTrendSvg(metrics) {
+      const target = $("#dailyTrendChart");
+      if (!metrics.length) {
+        target.innerHTML = `<div class="empty">ยังไม่มีข้อมูลแนวโน้มในช่วงที่เลือก</div>`;
+        return;
+      }
+      const width = Math.max(720, metrics.length * 42);
+      const height = 260;
+      const pad = { left: 42, right: 18, top: 18, bottom: 42 };
+      const max = Math.max(1, ...metrics.flatMap(([, item]) => [item.wo, item.appointment, item.keyed]));
+      const x = (index) => pad.left + (metrics.length === 1 ? 0 : index * (width - pad.left - pad.right) / (metrics.length - 1));
+      const y = (value) => height - pad.bottom - value * (height - pad.top - pad.bottom) / max;
+      const series = [
+        { key: "wo", color: "#1769d1" }, { key: "appointment", color: "#f59e0b" }, { key: "keyed", color: "#16a34a" }
+      ];
+      const grid = [0, .25, .5, .75, 1].map((ratio) => {
+        const gy = y(max * ratio);
+        return `<line x1="${pad.left}" y1="${gy}" x2="${width - pad.right}" y2="${gy}" stroke="#d9e5f7"/><text x="6" y="${gy + 4}" font-size="11" fill="#64748b">${Math.round(max * ratio)}</text>`;
+      }).join("");
+      const lines = series.map((serie) => {
+        const points = metrics.map(([, item], index) => `${x(index)},${y(item[serie.key])}`).join(" ");
+        const dots = metrics.map(([, item], index) => `<circle cx="${x(index)}" cy="${y(item[serie.key])}" r="3" fill="${serie.color}"><title>${item[serie.key]}</title></circle>`).join("");
+        return `<polyline points="${points}" fill="none" stroke="${serie.color}" stroke-width="3" stroke-linejoin="round"/>${dots}`;
+      }).join("");
+      const labels = metrics.map(([key], index) => index % Math.max(1, Math.ceil(metrics.length / 12)) === 0
+        ? `<text x="${x(index)}" y="${height - 16}" text-anchor="middle" font-size="10" fill="#64748b">${key.slice(5).replace("-", "/")}</text>` : "").join("");
+      target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="กราฟแนวโน้มรายวัน">${grid}${lines}${labels}</svg>`;
+    }
+
+    function completedStatusCount(statuses) {
+      return Object.entries(statuses).filter(([key]) => key.startsWith("Completed")).reduce((sum, [, value]) => sum + value, 0);
+    }
+
+    function formatDateKey(key) {
+      const [year, month, day] = key.split("-");
+      return `${day}/${month}/${Number(year) + 543}`;
+    }
+
+    function formatWeekday(key) {
+      const date = new Date(`${key}T00:00:00`);
+      return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("th-TH", { weekday: "short" });
+    }
+
+    function renderSalesKpi(sourceRecords) {
+      const statuses = [...new Set(sourceRecords.map((record) => String(record.operationStatus || "(ว่าง)").trim() || "(ว่าง)"))]
+        .sort((a, b) => a.localeCompare(b, "th"));
+      const groups = new Map();
+      sourceRecords.forEach((record) => {
+        const name = normalizeNameOption(record.salesName) || "(ไม่ระบุชื่อเซลล์)";
+        if (!groups.has(name)) groups.set(name, { total: 0, wo: 0, appointment: 0, statuses: {} });
+        const item = groups.get(name);
+        item.total += 1;
+        if (dateKey(record.woCreateTime)) item.wo += 1;
+        if (dateKey(record.appointmentDate)) item.appointment += 1;
+        const status = String(record.operationStatus || "(ว่าง)").trim() || "(ว่าง)";
+        item.statuses[status] = (item.statuses[status] || 0) + 1;
+      });
+      const rows = [...groups.entries()].sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], "th"));
+      $("#salesKpiHead").innerHTML = `<tr><th>ชื่อเซลล์</th><th>งานทั้งหมด</th><th>มี WO</th><th>มีวันนัด</th>${statuses.map((status) => `<th>${escapeHtml(statusText[status] || status)}</th>`).join("")}<th>Completed %</th></tr>`;
+      $("#salesKpiBody").innerHTML = rows.length ? rows.map(([name, item]) => {
+        const completed = completedStatusCount(item.statuses);
+        const percent = item.total ? Math.round(completed * 100 / item.total) : 0;
+        const scoreClass = percent >= 80 ? "kpi-good" : percent >= 50 ? "kpi-watch" : "kpi-risk";
+        return `<tr><td>${escapeHtml(name)}</td><td><strong>${item.total}</strong></td><td>${item.wo}</td><td>${item.appointment}</td>${statuses.map((status) => `<td>${item.statuses[status] || 0}</td>`).join("")}<td class="kpi-score ${scoreClass}">${percent}%</td></tr>`;
+      }).join("") : `<tr><td colspan="${statuses.length + 5}" class="empty">ยังไม่มีข้อมูล KPI</td></tr>`;
+    }
+
     function matchesAreaTarget(record, target) {
       if (target.text) {
         return String(`${record.ownArea || ""} ${record.workArea || ""} ${record.notes || ""}`).includes(target.text);
@@ -2705,6 +2971,8 @@
       $("#totalInstallCount").textContent = totalInstall;
       $("#completedInstallCount").textContent = totalCompleted;
       $("#pendingInstallCount").textContent = totalPending;
+      renderDailyAnalytics(sourceRecords);
+      renderSalesKpi(sourceRecords);
 
       $("#installSummary").innerHTML = installTargets.map((target) => {
         const item = summary.installs[target.key] || { total: 0, completed: 0, pending: 0 };
