@@ -256,9 +256,13 @@
 
     .analytics-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(300px, .5fr);
+      grid-template-columns: 1fr;
       gap: 18px;
       align-items: start;
+    }
+
+    .dashboard-bottom-section {
+      scroll-margin-top: 92px;
     }
 
     .trend-legend {
@@ -878,6 +882,36 @@
       background: linear-gradient(180deg, #f8fbff, #eef6ff);
     }
 
+    .thailand-map-shell {
+      position: relative;
+      min-height: 610px;
+      overflow: hidden;
+      border: 1px solid #bfdbfe;
+      border-radius: 24px;
+      background: radial-gradient(circle at 72% 18%, rgba(255,255,255,.96), transparent 30%), linear-gradient(145deg, #eff8ff 0%, #dff4ff 52%, #ecfeff 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+    }
+
+    .thailand-map-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(23,105,209,.13) 1px, transparent 1px);
+      background-size: 18px 18px;
+      pointer-events: none;
+    }
+
+    .thailand-map-svg { position: relative; display: block; width: 100%; height: 610px; }
+    .thailand-shape { fill: url(#thailandFill); stroke: #1769d1; stroke-width: 3; filter: drop-shadow(0 12px 14px rgba(30,64,175,.2)); }
+    .thailand-region-line { fill: none; stroke: rgba(255,255,255,.76); stroke-width: 2; stroke-dasharray: 7 6; }
+    .province-bubble { fill: #f97316; stroke: #fff; stroke-width: 3; opacity: .9; filter: drop-shadow(0 4px 5px rgba(124,45,18,.25)); transition: opacity .2s ease; }
+    .province-point:hover .province-bubble { opacity: 1; }
+    .province-point-label { fill: #0f3b66; font-size: 12px; font-weight: 800; paint-order: stroke; stroke: rgba(255,255,255,.96); stroke-width: 4px; stroke-linejoin: round; }
+    .province-point-count { fill: #fff; font-size: 11px; font-weight: 900; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .thailand-map-title { fill: #0f3b66; font-size: 17px; font-weight: 900; }
+    .thailand-map-subtitle { fill: #64748b; font-size: 11px; font-weight: 600; }
+    .map-size-legend { fill: rgba(255,255,255,.88); stroke: #bfdbfe; }
+
     .area-card-map {
       width: 100%;
       min-height: 360px;
@@ -1091,7 +1125,7 @@
           </div>
         </div>
 
-        <div class="analytics-grid">
+        <div class="analytics-grid dashboard-bottom-section" id="dailyAnalyticsSection">
           <div class="panel">
             <div class="section-title">
               <h3>แนวโน้มงานรายวัน</h3>
@@ -1112,7 +1146,7 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel dashboard-bottom-section" id="dailyDetailSection">
           <div class="section-title">
             <h3>รายละเอียดรายวัน</h3>
           </div>
@@ -1125,7 +1159,7 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel dashboard-bottom-section" id="salesKpiSection">
           <div class="section-title">
             <h3>KPI แยกตามชื่อเซลล์</h3>
           </div>
@@ -2588,51 +2622,56 @@
 
     function renderProvinceMap(sourceRecords = records) {
       const counts = countByField("province", sourceRecords);
-      const defaultProvinceNames = ["ฉะเชิงเทรา", "ปราจีนบุรี", "สระแก้ว", "ชลบุรี", "ระยอง", "จันทบุรี", "ตราด"];
-      const provinceSlots = [
-        { x: 35, y: 42, w: 220, h: 84, color: "#dbeafe" },
-        { x: 255, y: 42, w: 215, h: 84, color: "#fee2e2" },
-        { x: 470, y: 48, w: 190, h: 78, color: "#fef3c7" },
-        { x: 80, y: 128, w: 205, h: 102, color: "#b7e4c7" },
-        { x: 275, y: 224, w: 210, h: 92, color: "#a8dadc" },
-        { x: 430, y: 142, w: 200, h: 104, color: "#ffd6a5" },
-        { x: 575, y: 252, w: 155, h: 110, color: "#cdb4db" },
-        { x: 40, y: 250, w: 195, h: 82, color: "#dcfce7" },
-        { x: 510, y: 18, w: 185, h: 72, color: "#ede9fe" },
-        { x: 245, y: 330, w: 230, h: 72, color: "#ffedd5" }
-      ];
-      const provinceRows = [
-        ...defaultProvinceNames.map((name) => [name, counts[name] || 0]),
-        ...Object.entries(counts)
-          .filter(([name]) => name !== "(ว่าง)" && !defaultProvinceNames.includes(name))
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
-      ].slice(0, provinceSlots.length);
-
-      const extraProvinces = Object.entries(counts)
-        .filter(([name]) => name !== "(ว่าง)" && !defaultProvinceNames.includes(name))
-        .sort((a, b) => b[1] - a[1]);
+      const provinceCoordinates = {
+        "เชียงราย": [124, 64], "เชียงใหม่": [102, 98], "แม่ฮ่องสอน": [72, 105], "ลำปาง": [135, 119], "น่าน": [165, 92],
+        "ตาก": [105, 166], "สุโขทัย": [143, 158], "พิษณุโลก": [170, 166], "เพชรบูรณ์": [192, 184], "นครสวรรค์": [158, 211],
+        "อุทัยธานี": [130, 226], "กาญจนบุรี": [113, 266], "พระนครศรีอยุธยา": [164, 260], "ปทุมธานี": [174, 278],
+        "กรุงเทพมหานคร": [176, 298], "กรุงเทพฯ": [176, 298], "สมุทรปราการ": [190, 310], "เพชรบุรี": [140, 316], "ประจวบคีรีขันธ์": [150, 353],
+        "เลย": [226, 137], "หนองคาย": [262, 104], "อุดรธานี": [265, 132], "ขอนแก่น": [263, 174], "มุกดาหาร": [321, 178],
+        "นครราชสีมา": [244, 224], "บุรีรัมย์": [273, 245], "สุรินทร์": [294, 255], "ศรีสะเกษ": [320, 246], "อุบลราชธานี": [344, 225],
+        "ปราจีนบุรี": [218, 273], "สระแก้ว": [247, 277], "ฉะเชิงเทรา": [204, 294], "ชลบุรี": [210, 318], "ระยอง": [232, 332],
+        "จันทบุรี": [260, 335], "ตราด": [282, 350], "ชุมพร": [157, 397], "ระนอง": [137, 418], "สุราษฎร์ธานี": [176, 445],
+        "พังงา": [145, 474], "ภูเก็ต": [130, 492], "กระบี่": [166, 492], "นครศรีธรรมราช": [194, 487], "ตรัง": [166, 525],
+        "พัทลุง": [193, 523], "สตูล": [168, 560], "สงขลา": [205, 554], "ปัตตานี": [229, 570], "ยะลา": [218, 591], "นราธิวาส": [247, 594]
+      };
+      const listItems = Object.entries(counts)
+        .filter(([name]) => name !== "(ว่าง)")
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
+      const maxCount = Math.max(1, ...listItems.map(([, count]) => count));
+      const mapPoints = listItems
+        .filter(([name]) => provinceCoordinates[name])
+        .slice(0, 24);
 
       $("#provinceMap").innerHTML = `
-        <svg class="province-map" viewBox="0 0 780 430" role="img" aria-label="แผนที่จำนวนงานตามจังหวัด">
-          <rect x="0" y="0" width="780" height="430" fill="transparent"></rect>
-          ${provinceRows.map(([name, count], index) => {
-            const province = provinceSlots[index];
+        <div class="thailand-map-shell">
+        <svg class="thailand-map-svg" viewBox="0 0 390 630" role="img" aria-label="แผนที่ประเทศไทยแสดงจำนวนงานตามจังหวัด">
+          <defs>
+            <linearGradient id="thailandFill" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#60a5fa"></stop><stop offset=".55" stop-color="#38bdf8"></stop><stop offset="1" stop-color="#2dd4bf"></stop>
+            </linearGradient>
+          </defs>
+          <text class="thailand-map-title" x="18" y="28">ประเทศไทย</text>
+          <text class="thailand-map-subtitle" x="18" y="46">วงกลมใหญ่ = จำนวนงานมาก</text>
+          <path class="thailand-shape" d="M118 38 C91 42 73 63 77 88 C81 108 67 124 77 145 C86 164 111 169 118 192 C125 214 111 235 124 251 C138 268 154 271 158 291 C161 311 146 325 147 351 C148 376 164 392 158 415 C151 438 139 462 147 486 C154 506 169 514 169 538 C169 559 178 588 197 607 L218 597 C225 579 218 561 230 546 C239 532 218 514 210 494 C202 475 207 454 195 437 C183 419 190 396 177 375 C168 360 180 337 192 326 C207 315 213 300 230 290 C248 278 266 286 285 275 C304 264 324 247 340 226 C350 213 343 194 329 187 C310 178 297 185 285 173 C273 160 286 142 272 127 C259 113 239 122 223 113 C208 104 207 85 190 76 C173 68 161 79 148 65 C137 53 136 36 118 38 Z"></path>
+          <path class="thailand-region-line" d="M84 147 C130 133 176 145 216 119 M121 244 C175 222 237 238 303 194 M153 353 C169 344 181 349 191 360 M151 455 C174 448 197 452 208 467"></path>
+          ${mapPoints.map(([name, count]) => {
+            const [x, y] = provinceCoordinates[name];
+            const radius = Math.round(6 + Math.sqrt(count / maxCount) * 17);
+            const labelX = x + radius + 5;
+            const labelY = y - Math.max(2, radius / 3);
             return `
-              <g>
-                <rect class="map-region" x="${province.x}" y="${province.y}" width="${province.w}" height="${province.h}" rx="22" fill="${province.color}"></rect>
-                <text class="map-label" x="${province.x + 22}" y="${province.y + 36}">${escapeHtml(truncateLabel(name, 16))}</text>
-                <text class="map-count" x="${province.x + 22}" y="${province.y + 76}">${count}</text>
+              <g class="province-point">
+                <title>${escapeHtml(name)}: ${count} งาน</title>
+                <circle class="province-bubble" cx="${x}" cy="${y}" r="${radius}"></circle>
+                <text class="province-point-count" x="${x}" y="${y}">${count}</text>
+                <text class="province-point-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateLabel(name, 14))}</text>
               </g>
             `;
           }).join("")}
-          <path d="M90 330 C190 390, 360 390, 470 330 S665 385, 735 320" fill="none" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".55"></path>
+          <g transform="translate(272 535)"><rect class="map-size-legend" width="102" height="72" rx="14"></rect><circle cx="21" cy="23" r="7" fill="#f97316" opacity=".9"></circle><circle cx="57" cy="23" r="14" fill="#f97316" opacity=".9"></circle><text class="thailand-map-subtitle" x="10" y="55">จำนวนงาน</text></g>
         </svg>
+        </div>
       `;
-
-      const listItems = [
-        ...defaultProvinceNames.map((name) => [name, counts[name] || 0]),
-        ...extraProvinces
-      ].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
 
       $("#provinceMapList").innerHTML = listItems.length ? listItems.map(([name, count]) => `
         <div class="map-list-item">
@@ -2792,6 +2831,7 @@
 
       return { installs, areas };
     }
+
 
     function dateKey(value) {
       const text = String(value || "").trim();
@@ -3424,6 +3464,10 @@
 
     $("#scriptUrl").value = isAppsScriptWebApp ? gasModeLabel : "โหมดตัวอย่างในเครื่อง";
     $("#cancelEditBtn").style.display = "none";
+    ["dailyDetailSection", "dailyAnalyticsSection", "salesKpiSection"].forEach((sectionId) => {
+      const section = document.getElementById(sectionId);
+      if (section) $("#dashboard").appendChild(section);
+    });
     renderCell39Options();
     syncReportMonthInputs();
     renderAll();
