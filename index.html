@@ -2651,7 +2651,11 @@
         { x: x - width / 2, y: y - radius - 10 - height },
         { x: x - width / 2, y: y + radius + 10 },
         { x: x + radius + 10, y: y - radius - height - 4 },
-        { x: x - radius - width - 10, y: y - radius - height - 4 }
+        { x: x - radius - width - 10, y: y - radius - height - 4 },
+        { x: x + radius + 18, y: y + radius + 12 },
+        { x: x - radius - width - 18, y: y + radius + 12 },
+        { x: x + radius + 18, y: y - radius - height - 14 },
+        { x: x - radius - width - 18, y: y - radius - height - 14 }
       ];
       const placeProvinceLabel = (x, y, radius, name) => {
         const label = truncateLabel(name, 12);
