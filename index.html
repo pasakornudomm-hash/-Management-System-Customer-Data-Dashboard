@@ -874,6 +874,9 @@
       align-items: stretch;
     }
 
+    .province-map-panel { grid-template-columns: minmax(0, 1fr); }
+    .province-map-panel > #provinceMapList { display: none; }
+
     .province-map {
       width: 100%;
       min-height: 430px;
@@ -909,7 +912,8 @@
     .province-point-label { fill: #0f3b66; font-size: 12px; font-weight: 800; pointer-events: none; }
     .province-label-box { fill: rgba(255,255,255,.96); stroke: #bfdbfe; stroke-width: 1.2; filter: drop-shadow(0 3px 4px rgba(15,59,102,.14)); }
     .province-label-line { stroke: rgba(23,105,209,.55); stroke-width: 1.4; stroke-dasharray: 3 3; }
-    .province-point-count { fill: #fff; font-size: 11px; font-weight: 900; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .province-point-count { display: none; }
+    .thailand-map-rail-title { fill: #0f3b66; font-size: 13px; font-weight: 900; }
     .thailand-map-title { fill: #0f3b66; font-size: 17px; font-weight: 900; }
     .thailand-map-subtitle { fill: #64748b; font-size: 11px; font-weight: 600; }
     .map-size-legend { fill: rgba(255,255,255,.88); stroke: #bfdbfe; }
@@ -1222,7 +1226,7 @@
               <h3>แผนที่จำนวนงานตามจังหวัด</h3>
             </div>
             <div class="table-hint">นับ AUTO จากข้อมูลล่าสุดในคอลัมน์จังหวัด ตำบล และอำเภอ</div>
-            <div class="map-panel">
+            <div class="map-panel province-map-panel">
               <div id="provinceMap"></div>
               <div class="map-list" id="provinceMapList"></div>
             </div>
@@ -2645,10 +2649,10 @@
         .filter(([name]) => provinceCoordinates[name])
         .slice(0, 24);
       const placeProvinceLabel = (x, y, radius, name, index) => {
-        const label = truncateLabel(name, 12);
-        const width = Math.max(54, Math.min(112, label.length * 7 + 18));
+        const label = truncateLabel(name, 10);
+        const width = 142;
         const height = 22;
-        return { x: 410, y: 52 + index * 31, width, height, label };
+        return { x: 400, y: 42 + index * 26, width, height, label };
       };
 
       $("#provinceMap").innerHTML = `
@@ -2661,11 +2665,12 @@
           </defs>
           <text class="thailand-map-title" x="18" y="28">ประเทศไทย</text>
           <text class="thailand-map-subtitle" x="18" y="46">วงกลมใหญ่ = จำนวนงานมาก</text>
+          <text class="thailand-map-rail-title" x="400" y="27">จังหวัด · จำนวนงาน</text>
           <path class="thailand-shape" d="M118 38 C91 42 73 63 77 88 C81 108 67 124 77 145 C86 164 111 169 118 192 C125 214 111 235 124 251 C138 268 154 271 158 291 C161 311 146 325 147 351 C148 376 164 392 158 415 C151 438 139 462 147 486 C154 506 169 514 169 538 C169 559 178 588 197 607 L218 597 C225 579 218 561 230 546 C239 532 218 514 210 494 C202 475 207 454 195 437 C183 419 190 396 177 375 C168 360 180 337 192 326 C207 315 213 300 230 290 C248 278 266 286 285 275 C304 264 324 247 340 226 C350 213 343 194 329 187 C310 178 297 185 285 173 C273 160 286 142 272 127 C259 113 239 122 223 113 C208 104 207 85 190 76 C173 68 161 79 148 65 C137 53 136 36 118 38 Z"></path>
           <path class="thailand-region-line" d="M84 147 C130 133 176 145 216 119 M121 244 C175 222 237 238 303 194 M153 353 C169 344 181 349 191 360 M151 455 C174 448 197 452 208 467"></path>
           ${mapPoints.map(([name, count], index) => {
             const [x, y] = provinceCoordinates[name];
-            const radius = Math.round(6 + Math.sqrt(count / maxCount) * 17);
+            const radius = 7;
             const placement = placeProvinceLabel(x, y, radius, name, index);
             const lineX = placement.x;
             const lineY = y < placement.y ? placement.y : y > placement.y + placement.height ? placement.y + placement.height : placement.y + placement.height / 2;
@@ -2673,14 +2678,13 @@
               <g class="province-point">
                 <title>${escapeHtml(name)}: ${count} งาน</title>
                 <circle class="province-bubble" cx="${x}" cy="${y}" r="${radius}"></circle>
-                <text class="province-point-count" x="${x}" y="${y}">${count}</text>
                 <line class="province-label-line" x1="${x}" y1="${y}" x2="${lineX}" y2="${lineY}"></line>
                 <rect class="province-label-box" x="${placement.x}" y="${placement.y}" width="${placement.width}" height="${placement.height}" rx="8"></rect>
-                <text class="province-point-label" x="${placement.x + 9}" y="${placement.y + 15}">${escapeHtml(placement.label)}</text>
+                <text class="province-point-label" x="${placement.x + 9}" y="${placement.y + 15}">${escapeHtml(placement.label)} · ${count}</text>
               </g>
             `;
           }).join("")}
-          <g transform="translate(410 525)"><rect class="map-size-legend" width="112" height="72" rx="14"></rect><circle cx="21" cy="23" r="7" fill="#f97316" opacity=".9"></circle><circle cx="57" cy="23" r="14" fill="#f97316" opacity=".9"></circle><text class="thailand-map-subtitle" x="10" y="55">จำนวนงาน</text></g>
+          <g transform="translate(400 585)"><rect class="map-size-legend" width="142" height="32" rx="10"></rect><circle cx="15" cy="16" r="6" fill="#f97316" opacity=".9"></circle><text class="thailand-map-subtitle" x="28" y="20">จุดบนแผนที่ = จังหวัด</text></g>
         </svg>
         </div>
       `;
