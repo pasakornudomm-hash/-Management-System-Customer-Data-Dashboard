@@ -2644,43 +2644,16 @@
       const mapPoints = listItems
         .filter(([name]) => provinceCoordinates[name])
         .slice(0, 24);
-      const labelBoxes = [];
-      const labelCandidates = (x, y, radius, width, height) => [
-        { x: x + radius + 8, y: y - height / 2 },
-        { x: x - radius - 8 - width, y: y - height / 2 },
-        { x: x - width / 2, y: y - radius - 10 - height },
-        { x: x - width / 2, y: y + radius + 10 },
-        { x: x + radius + 10, y: y - radius - height - 4 },
-        { x: x - radius - width - 10, y: y - radius - height - 4 },
-        { x: x + radius + 18, y: y + radius + 12 },
-        { x: x - radius - width - 18, y: y + radius + 12 },
-        { x: x + radius + 18, y: y - radius - height - 14 },
-        { x: x - radius - width - 18, y: y - radius - height - 14 }
-      ];
-      const placeProvinceLabel = (x, y, radius, name) => {
+      const placeProvinceLabel = (x, y, radius, name, index) => {
         const label = truncateLabel(name, 12);
-        const width = Math.max(54, Math.min(108, label.length * 7 + 18));
+        const width = Math.max(54, Math.min(112, label.length * 7 + 18));
         const height = 22;
-        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-        const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-        const candidates = labelCandidates(x, y, radius, width, height).map((candidate) => ({
-          ...candidate,
-          x: clamp(candidate.x, 8, 382 - width),
-          y: clamp(candidate.y, 52, 612 - height),
-          width,
-          height
-        }));
-        const placement = candidates.sort((a, b) => {
-          const score = (candidate) => labelBoxes.reduce((total, box) => total + (overlap(candidate, box) ? 10000 : 0), 0) + Math.abs(candidate.x - x) + Math.abs(candidate.y + height / 2 - y);
-          return score(a) - score(b);
-        })[0];
-        labelBoxes.push(placement);
-        return { ...placement, label };
+        return { x: 410, y: 52 + index * 31, width, height, label };
       };
 
       $("#provinceMap").innerHTML = `
         <div class="thailand-map-shell">
-        <svg class="thailand-map-svg" viewBox="0 0 390 630" role="img" aria-label="แผนที่ประเทศไทยแสดงจำนวนงานตามจังหวัด">
+        <svg class="thailand-map-svg" viewBox="0 0 560 630" role="img" aria-label="แผนที่ประเทศไทยแสดงจำนวนงานตามจังหวัด">
           <defs>
             <linearGradient id="thailandFill" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stop-color="#60a5fa"></stop><stop offset=".55" stop-color="#38bdf8"></stop><stop offset="1" stop-color="#2dd4bf"></stop>
@@ -2690,11 +2663,11 @@
           <text class="thailand-map-subtitle" x="18" y="46">วงกลมใหญ่ = จำนวนงานมาก</text>
           <path class="thailand-shape" d="M118 38 C91 42 73 63 77 88 C81 108 67 124 77 145 C86 164 111 169 118 192 C125 214 111 235 124 251 C138 268 154 271 158 291 C161 311 146 325 147 351 C148 376 164 392 158 415 C151 438 139 462 147 486 C154 506 169 514 169 538 C169 559 178 588 197 607 L218 597 C225 579 218 561 230 546 C239 532 218 514 210 494 C202 475 207 454 195 437 C183 419 190 396 177 375 C168 360 180 337 192 326 C207 315 213 300 230 290 C248 278 266 286 285 275 C304 264 324 247 340 226 C350 213 343 194 329 187 C310 178 297 185 285 173 C273 160 286 142 272 127 C259 113 239 122 223 113 C208 104 207 85 190 76 C173 68 161 79 148 65 C137 53 136 36 118 38 Z"></path>
           <path class="thailand-region-line" d="M84 147 C130 133 176 145 216 119 M121 244 C175 222 237 238 303 194 M153 353 C169 344 181 349 191 360 M151 455 C174 448 197 452 208 467"></path>
-          ${mapPoints.map(([name, count]) => {
+          ${mapPoints.map(([name, count], index) => {
             const [x, y] = provinceCoordinates[name];
             const radius = Math.round(6 + Math.sqrt(count / maxCount) * 17);
-            const placement = placeProvinceLabel(x, y, radius, name);
-            const lineX = x < placement.x ? placement.x : x > placement.x + placement.width ? placement.x + placement.width : placement.x + placement.width / 2;
+            const placement = placeProvinceLabel(x, y, radius, name, index);
+            const lineX = placement.x;
             const lineY = y < placement.y ? placement.y : y > placement.y + placement.height ? placement.y + placement.height : placement.y + placement.height / 2;
             return `
               <g class="province-point">
@@ -2707,7 +2680,7 @@
               </g>
             `;
           }).join("")}
-          <g transform="translate(272 535)"><rect class="map-size-legend" width="102" height="72" rx="14"></rect><circle cx="21" cy="23" r="7" fill="#f97316" opacity=".9"></circle><circle cx="57" cy="23" r="14" fill="#f97316" opacity=".9"></circle><text class="thailand-map-subtitle" x="10" y="55">จำนวนงาน</text></g>
+          <g transform="translate(410 525)"><rect class="map-size-legend" width="112" height="72" rx="14"></rect><circle cx="21" cy="23" r="7" fill="#f97316" opacity=".9"></circle><circle cx="57" cy="23" r="14" fill="#f97316" opacity=".9"></circle><text class="thailand-map-subtitle" x="10" y="55">จำนวนงาน</text></g>
         </svg>
         </div>
       `;
