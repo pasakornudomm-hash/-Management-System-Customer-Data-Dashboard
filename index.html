@@ -906,7 +906,9 @@
     .thailand-region-line { fill: none; stroke: rgba(255,255,255,.76); stroke-width: 2; stroke-dasharray: 7 6; }
     .province-bubble { fill: #f97316; stroke: #fff; stroke-width: 3; opacity: .9; filter: drop-shadow(0 4px 5px rgba(124,45,18,.25)); transition: opacity .2s ease; }
     .province-point:hover .province-bubble { opacity: 1; }
-    .province-point-label { fill: #0f3b66; font-size: 12px; font-weight: 800; paint-order: stroke; stroke: rgba(255,255,255,.96); stroke-width: 4px; stroke-linejoin: round; }
+    .province-point-label { fill: #0f3b66; font-size: 12px; font-weight: 800; pointer-events: none; }
+    .province-label-box { fill: rgba(255,255,255,.96); stroke: #bfdbfe; stroke-width: 1.2; filter: drop-shadow(0 3px 4px rgba(15,59,102,.14)); }
+    .province-label-line { stroke: rgba(23,105,209,.55); stroke-width: 1.4; stroke-dasharray: 3 3; }
     .province-point-count { fill: #fff; font-size: 11px; font-weight: 900; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
     .thailand-map-title { fill: #0f3b66; font-size: 17px; font-weight: 900; }
     .thailand-map-subtitle { fill: #64748b; font-size: 11px; font-weight: 600; }
@@ -2642,6 +2644,35 @@
       const mapPoints = listItems
         .filter(([name]) => provinceCoordinates[name])
         .slice(0, 24);
+      const labelBoxes = [];
+      const labelCandidates = (x, y, radius, width, height) => [
+        { x: x + radius + 8, y: y - height / 2 },
+        { x: x - radius - 8 - width, y: y - height / 2 },
+        { x: x - width / 2, y: y - radius - 10 - height },
+        { x: x - width / 2, y: y + radius + 10 },
+        { x: x + radius + 10, y: y - radius - height - 4 },
+        { x: x - radius - width - 10, y: y - radius - height - 4 }
+      ];
+      const placeProvinceLabel = (x, y, radius, name) => {
+        const label = truncateLabel(name, 12);
+        const width = Math.max(54, Math.min(108, label.length * 7 + 18));
+        const height = 22;
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+        const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+        const candidates = labelCandidates(x, y, radius, width, height).map((candidate) => ({
+          ...candidate,
+          x: clamp(candidate.x, 8, 382 - width),
+          y: clamp(candidate.y, 52, 612 - height),
+          width,
+          height
+        }));
+        const placement = candidates.sort((a, b) => {
+          const score = (candidate) => labelBoxes.reduce((total, box) => total + (overlap(candidate, box) ? 10000 : 0), 0) + Math.abs(candidate.x - x) + Math.abs(candidate.y + height / 2 - y);
+          return score(a) - score(b);
+        })[0];
+        labelBoxes.push(placement);
+        return { ...placement, label };
+      };
 
       $("#provinceMap").innerHTML = `
         <div class="thailand-map-shell">
@@ -2658,14 +2689,17 @@
           ${mapPoints.map(([name, count]) => {
             const [x, y] = provinceCoordinates[name];
             const radius = Math.round(6 + Math.sqrt(count / maxCount) * 17);
-            const labelX = x + radius + 5;
-            const labelY = y - Math.max(2, radius / 3);
+            const placement = placeProvinceLabel(x, y, radius, name);
+            const lineX = x < placement.x ? placement.x : x > placement.x + placement.width ? placement.x + placement.width : placement.x + placement.width / 2;
+            const lineY = y < placement.y ? placement.y : y > placement.y + placement.height ? placement.y + placement.height : placement.y + placement.height / 2;
             return `
               <g class="province-point">
                 <title>${escapeHtml(name)}: ${count} งาน</title>
                 <circle class="province-bubble" cx="${x}" cy="${y}" r="${radius}"></circle>
                 <text class="province-point-count" x="${x}" y="${y}">${count}</text>
-                <text class="province-point-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateLabel(name, 14))}</text>
+                <line class="province-label-line" x1="${x}" y1="${y}" x2="${lineX}" y2="${lineY}"></line>
+                <rect class="province-label-box" x="${placement.x}" y="${placement.y}" width="${placement.width}" height="${placement.height}" rx="8"></rect>
+                <text class="province-point-label" x="${placement.x + 9}" y="${placement.y + 15}">${escapeHtml(placement.label)}</text>
               </g>
             `;
           }).join("")}
