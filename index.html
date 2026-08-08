@@ -2907,9 +2907,9 @@
         acc.appointment += item.appointment;
         acc.keyed += item.keyed;
         return acc;
-      }, { wo: 0, appointment: 0, keyed: 0 });
+      }, { wo: 0, confirmed: 0, appointment: 0, keyed: 0 });
       const peak = visible.reduce((best, current) => {
-        const total = current[1].wo + current[1].appointment + current[1].keyed;
+        const total = current[1].wo + current[1].confirmed + current[1].appointment + current[1].keyed;
         return total > best.total ? { key: current[0], total } : best;
       }, { key: "", total: 0 });
 
