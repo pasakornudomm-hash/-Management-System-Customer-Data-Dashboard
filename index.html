@@ -880,10 +880,13 @@
     }
 
     .province-map-panel > #provinceMapList {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 12px;
+      min-width: 0;
       max-height: 720px;
-      overflow: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
       padding-right: 6px;
       scrollbar-color: #b7d2f4 transparent;
       scrollbar-width: thin;
@@ -1017,6 +1020,7 @@
       position: sticky;
       top: 0;
       z-index: 4;
+      flex: 0 0 auto;
       padding: 16px;
       border: 1px solid #bcd6f5;
       border-radius: 16px;
@@ -1052,10 +1056,12 @@
       --rank-color: #1769d1;
       position: relative;
       display: grid;
+      flex: 0 0 auto;
       grid-template-columns: 38px minmax(0, 1fr) auto;
       gap: 11px;
       align-items: center;
       overflow: hidden;
+      min-height: 70px;
       padding: 13px 13px 12px;
       border: 1px solid #d7e5f5;
       border-radius: 15px;
@@ -1087,17 +1093,18 @@
     .province-rank-detail { min-width: 0; }
 
     .province-rank-name {
-      overflow: hidden;
+      overflow: visible;
+      overflow-wrap: anywhere;
       color: var(--ink);
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 800;
       line-height: 1.3;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      text-overflow: clip;
+      white-space: normal;
     }
 
     .province-rank-bar {
-      height: 7px;
+      height: 8px;
       margin-top: 8px;
       overflow: hidden;
       border-radius: 999px;
@@ -1119,7 +1126,7 @@
     .province-rank-count {
       display: block;
       color: var(--blue-900);
-      font-size: 21px;
+      font-size: 22px;
       font-weight: 900;
       line-height: 1.1;
     }
@@ -1247,6 +1254,10 @@
         grid-template-columns: 1fr 1fr;
       }
 
+      .province-map-panel {
+        grid-template-columns: 1fr;
+      }
+
       .install-cards {
         grid-template-columns: 1fr 1fr;
       }
@@ -1294,7 +1305,7 @@
       .province-image-stage { min-height: 520px; }
       .province-image-canvas { height: 520px; }
       .province-map-panel > #provinceMapList { max-height: 560px; }
-      .province-rank-card { grid-template-columns: 36px minmax(0, 1fr) auto; padding: 12px 10px; }
+      .province-rank-card { grid-template-columns: 36px minmax(0, 1fr) auto; min-height: 64px; padding: 12px 10px; }
       .province-rank-count { font-size: 19px; }
     }
   </style>
@@ -2868,9 +2879,7 @@
       const maxCount = Math.max(1, ...listItems.map(([, count]) => count));
       const totalCount = listItems.reduce((sum, [, count]) => sum + count, 0);
       const numberFormatter = new Intl.NumberFormat("th-TH");
-      const mapPoints = listItems
-        .filter(([name]) => provinceImageCoordinates[name])
-        .slice(0, 5);
+      const mapPoints = [];
       const badgeColors = ["#1769d1", "#7c3aed", "#f97316", "#16a34a", "#db2777"];
       const rankColor = (index) => badgeColors[index] || "#7890aa";
 
@@ -2886,17 +2895,17 @@
             }).join("")}
             </div>
           </div>
-          <div class="province-image-note">หมุดเลข 1–5 ตรงกับอันดับด้านขวา · จำนวนงานแสดงเป็นตัวเลขและแถบเปรียบเทียบที่อ่านง่าย</div>
+          <div class="province-image-note">แผนที่ใช้สำหรับดูตำแหน่งจังหวัด · จำนวนงานแสดงชัดเจนในรายการด้านขวา</div>
         </div>
       `;
 
       $("#provinceMapList").innerHTML = listItems.length ? `
         <div class="province-ranking-header">
           <div class="province-ranking-heading">
-            <span>อันดับจังหวัดตามจำนวนงาน</span>
+            <span>จำนวนงานรายจังหวัด</span>
             <strong>${numberFormatter.format(totalCount)} งาน</strong>
           </div>
-          <div class="province-ranking-subtitle">พบข้อมูล ${numberFormatter.format(listItems.length)} จังหวัด · เรียงจากมากไปน้อย</div>
+          <div class="province-ranking-subtitle">แสดงครบ ${numberFormatter.format(listItems.length)} จังหวัด · เรียงจากมากไปน้อย · เลื่อนดูได้</div>
         </div>
         ${listItems.map(([name, count], index) => {
           const width = Math.max(2, Math.round((count / maxCount) * 100));
