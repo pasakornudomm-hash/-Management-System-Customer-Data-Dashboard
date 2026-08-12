@@ -1865,6 +1865,7 @@
   <script>
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbybY5j57KHPks8Grhm713wCc4f84pm9E9bPWehXHnT-mUf9TmRmM7uZ3FDQO98cDA/exec";
     const API_TIMEOUT_MS = 45000;
+    const API_MUTATION_TIMEOUT_MS = 20000;
     const API_READ_CACHE_MS = 15000;
     const SEARCH_DEBOUNCE_MS = 180;
     const TABLE_RENDER_CHUNK_SIZE = 180;
@@ -2032,6 +2033,7 @@
     let activeView = "dashboard";
     const dirtyViews = new Set(["dashboard", "table", "history"]);
     let isSubmittingRecord = false;
+    let isMutatingSheet = false;
     let tableRenderToken = 0;
     let historyRenderToken = 0;
     let duplicateLookupCache = null;
@@ -2275,11 +2277,12 @@
     function embeddedSheetRequest(action, payload) {
       return new Promise((resolve, reject) => {
         let settled = false;
+        const requestTimeoutMs = ["create", "update", "delete"].includes(action) ? API_MUTATION_TIMEOUT_MS : API_TIMEOUT_MS;
         const timeout = window.setTimeout(() => {
           if (settled) return;
           settled = true;
           reject(new Error("Google Apps Script ตอบกลับช้าเกินเวลาที่กำหนด"));
-        }, API_TIMEOUT_MS);
+        }, requestTimeoutMs);
 
         google.script.run
           .withSuccessHandler((result) => {
@@ -2304,7 +2307,8 @@
 
     async function remoteSheetRequest(action, payload) {
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      const requestTimeoutMs = ["create", "update", "delete"].includes(action) ? API_MUTATION_TIMEOUT_MS : API_TIMEOUT_MS;
+      const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
 
       try {
         const response = await fetch(GAS_WEB_APP_URL, {
@@ -2344,11 +2348,13 @@
 
     function isRetryableApiError(error) {
       const message = String((error && error.message) || error || "").toLowerCase();
-      return message.includes("fetch") || message.includes("network") || message.includes("http 5") || message.includes("หมดเวลา") || message.includes("ช้าเกินเวลา");
+      return message.includes("fetch") || message.includes("network") || message.includes("http 4") ||
+        message.includes("http 5") || message.includes("timeout") || message.includes("aborted") ||
+        message.includes("json") || message.includes("expected property") || message.includes("html") ||
+        message.includes("หมดเวลา") || message.includes("ช้าเกินเวลา");
     }
-
     async function requestWithRetry(action, payload, canRetry) {
-      const attempts = canRetry ? 2 : 1;
+      const attempts = canRetry || ["update", "delete"].includes(action) ? 2 : 1;
       let lastError;
 
       for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -3792,31 +3798,100 @@
       return message;
     }
 
+    function mutationFingerprint(record) {
+      return fields.map((field) => String(record?.[field] || "").trim()).join("\u001f");
+    }
+
+    function findMutationMatch(sourceRecords, attemptedRecord, attemptedId = "") {
+      if (attemptedId) {
+        const byId = sourceRecords.find((record) => String(record.id) === String(attemptedId));
+        if (byId) return byId;
+      }
+      const fingerprint = mutationFingerprint(attemptedRecord);
+      if (!fingerprint.replace(/\u001f/g, "")) return null;
+      return sourceRecords.find((record) => mutationFingerprint(record) === fingerprint) || null;
+    }
+
+    function isMutationUncertain(error) {
+      const message = String((error && error.message) || error || "").toLowerCase();
+      return message.includes("timeout") || message.includes("network") || message.includes("fetch") ||
+        message.includes("aborted") || message.includes("http 4") || message.includes("http 5") ||
+        message.includes("json") || message.includes("expected property") || message.includes("html") ||
+        message.includes("หมดเวลา") || message.includes("เชื่อมต่อ") || message.includes("ช้าเกินเวลา") ||
+        message.includes("record not found");
+    }
+    function requireMutationRecord(result) {
+      if (!result || !result.record || !result.record.id) {
+        throw new Error("Google Sheet did not return the saved record");
+      }
+      return result.record;
+    }
+
+    async function reconcileMutation(attemptedRecord, action) {
+      const listResult = await sheetRequest("list", {}, { force: true });
+      const latestRecords = Array.isArray(listResult.records) ? listResult.records : [];
+      const found = action === "delete" ? null : findMutationMatch(latestRecords, attemptedRecord, attemptedRecord.id);
+      const stillExists = action === "delete" && latestRecords.some((record) => String(record.id) === String(attemptedRecord.id));
+      records = latestRecords;
+      cell39OptionsFromApi = Array.isArray(listResult.cell39Options) ? listResult.cell39Options : cell39OptionsFromApi;
+      dashboardSummary = null;
+      markRecordsChanged();
+      renderCell39Options();
+      renderAll({ persist: false });
+      return { found, removed: action === "delete" && !stillExists };
+    }
+
+    function findLocalIdentityConflict(data, currentId = "") {
+      const identityFields = ["hiNumber", "trueId"];
+      const fingerprint = mutationFingerprint(data);
+      return records.find((record) => {
+        if (currentId && String(record.id) === String(currentId)) return false;
+        if (fingerprint && mutationFingerprint(record) === fingerprint) return true;
+        return identityFields.some((field) => {
+          const value = String(data[field] || "").trim().toLowerCase();
+          return value && value === String(record[field] || "").trim().toLowerCase();
+        });
+      }) || null;
+    }
     $("#recordForm").addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (isSubmittingRecord) return;
+      if (isSubmittingRecord || isMutatingSheet) return;
       setRecordSubmitting(true);
-      const id = $("#recordId").value;
+      isMutatingSheet = true;
+      const existingId = $("#recordId").value.trim();
       const data = getFormData();
-      setStatus(id ? "กำลังบันทึกการแก้ไขลง Google Sheet..." : "กำลังบันทึกข้อมูลลง Google Sheet...");
-
+      const id = existingId || makeId();
+      const mutationRecord = { id, ...data };
+      if (!existingId) {
+        const conflict = findLocalIdentityConflict(data);
+        if (conflict) {
+          setStatus(`พบ HSI Number หรือ TRUE ID ซ้ำกับรายการ ${conflict.customerName || conflict.id} จึงยังไม่บันทึก`, true);
+          isMutatingSheet = false;
+          setRecordSubmitting(false);
+          return;
+        }
+        $("#recordId").value = id;
+      }
+      setStatus(existingId ? "กำลังบันทึกการแก้ไขลง Google Sheet..." : "กำลังบันทึกข้อมูลลง Google Sheet...");
       try {
         if (isAppsScriptWebApp) {
-          if (id) {
-            const result = await sheetRequest("update", { record: { id, ...data } });
-            records = records.map((record) => record.id === id ? result.record : record);
+          if (existingId) {
+            const result = await sheetRequest("update", { record: mutationRecord });
+            const savedRecord = requireMutationRecord(result);
+            records = records.map((record) => record.id === id ? savedRecord : record);
             if (result.history) historyRecords.unshift(result.history);
           } else {
-            const result = await sheetRequest("create", { record: data });
-            records.unshift(result.record);
+            const result = await sheetRequest("create", { record: mutationRecord });
+            const savedRecord = requireMutationRecord(result);
+            records.unshift(savedRecord);
             if (result.history) historyRecords.unshift(result.history);
           }
           setStatus("บันทึกข้อมูลลง Google Sheet แล้ว");
-        } else if (id) {
+        } else if (existingId) {
           records = records.map((record) => record.id === id ? { ...record, ...data } : record);
           setStatus("บันทึกในเครื่องแล้ว เพราะยังไม่ได้ตั้งค่า Google Sheet");
         } else {
-          records.unshift({ id: makeId(), ...data });
+          records.unshift(mutationRecord);
           setStatus("บันทึกในเครื่องแล้ว เพราะยังไม่ได้ตั้งค่า Google Sheet");
         }
 
@@ -3825,8 +3900,27 @@
         renderAll();
         switchView("table");
       } catch (error) {
+        let recoveredRecord = null;
+        if (isMutationUncertain(error)) {
+          try {
+            const reconciliation = await reconcileMutation(mutationRecord, existingId ? "update" : "create");
+            recoveredRecord = reconciliation.found;
+          } catch (reconcileError) {
+            console.warn("Mutation reconciliation failed", reconcileError);
+          }
+        }
+        if (recoveredRecord) {
+          rememberAdminName(data.adminName);
+          setStatus("บันทึกสำเร็จแล้ว ระบบดึงข้อมูลล่าสุดกลับมาให้เรียบร้อย");
+          resetForm();
+          renderAll({ persist: false });
+          switchView("table");
+          return;
+        }
+        if (!existingId) $("#recordId").value = "";
         setStatus(`บันทึกไม่สำเร็จ: ${friendlySaveError(error)}`, true);
       } finally {
+        isMutatingSheet = false;
         setRecordSubmitting(false);
       }
     });
@@ -3852,9 +3946,10 @@
         if (record) fillForm(record);
       }
 
-      if (deleteId && !pendingDeletes.has(deleteId) && confirm("ต้องการลบรายการนี้ใช่ไหม?")) {
+      if (deleteId && !pendingDeletes.has(deleteId) && !isMutatingSheet && confirm("ต้องการลบรายการนี้ใช่ไหม?")) {
         const deleteButton = event.target.closest("button[data-delete]");
         pendingDeletes.add(deleteId);
+        isMutatingSheet = true;
         if (deleteButton) deleteButton.disabled = true;
         try {
           if (isAppsScriptWebApp) {
@@ -3866,8 +3961,22 @@
           records = records.filter((item) => item.id !== deleteId);
           renderAll();
         } catch (error) {
+          let reconciled = false;
+          if (isMutationUncertain(error)) {
+            try {
+              const reconciliation = await reconcileMutation({ id: deleteId }, "delete");
+              reconciled = reconciliation.removed;
+            } catch (reconcileError) {
+              console.warn("Delete reconciliation failed", reconcileError);
+            }
+          }
+          if (reconciled) {
+            setStatus("ลบข้อมูลสำเร็จแล้ว ระบบดึงข้อมูลล่าสุดกลับมาให้เรียบร้อย");
+            return;
+          }
           setStatus(`ลบไม่สำเร็จ: ${error.message}`, true);
         } finally {
+          isMutatingSheet = false;
           pendingDeletes.delete(deleteId);
           if (deleteButton && deleteButton.isConnected) deleteButton.disabled = false;
         }
