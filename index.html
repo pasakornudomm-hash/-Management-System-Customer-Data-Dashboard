@@ -476,6 +476,31 @@
       white-space: nowrap;
     }
 
+    .name-highlight {
+      display: inline-flex;
+      align-items: center;
+      max-width: 190px;
+      min-height: 27px;
+      padding: 3px 10px;
+      overflow: hidden;
+      border: 1px solid var(--name-border, #bfdbfe);
+      border-radius: 999px;
+      background: var(--name-bg, #eff6ff);
+      color: var(--name-ink, #1e3a8a);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34);
+    }
+
+    .name-choice.name-highlight-choice {
+      border-color: var(--name-border, #bfdbfe);
+      background: var(--name-bg, #eff6ff);
+      color: var(--name-ink, #1e3a8a);
+    }
+
     .name-choice:hover,
     .name-choice:focus {
       border-color: var(--blue-600);
@@ -2128,6 +2153,40 @@
       return text ? escapeHtml(text) : "-";
     }
 
+    const nameHighlightPalette = [
+      { bg: "#dbeafe", ink: "#1e3a8a", border: "#60a5fa" },
+      { bg: "#dcfce7", ink: "#14532d", border: "#4ade80" },
+      { bg: "#fef3c7", ink: "#78350f", border: "#f59e0b" },
+      { bg: "#fce7f3", ink: "#831843", border: "#f472b6" },
+      { bg: "#ede9fe", ink: "#4c1d95", border: "#a78bfa" },
+      { bg: "#cffafe", ink: "#164e63", border: "#22d3ee" },
+      { bg: "#ffedd5", ink: "#7c2d12", border: "#fb923c" },
+      { bg: "#ccfbf1", ink: "#134e4a", border: "#2dd4bf" },
+      { bg: "#e0e7ff", ink: "#312e81", border: "#818cf8" },
+      { bg: "#fee2e2", ink: "#7f1d1d", border: "#f87171" }
+    ];
+
+    function nameHighlightColors(value) {
+      const normalized = normalizeNameOption(value).toLocaleLowerCase("th");
+      let hash = 2166136261;
+      for (let index = 0; index < normalized.length; index += 1) {
+        hash ^= normalized.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return nameHighlightPalette[(hash >>> 0) % nameHighlightPalette.length];
+    }
+
+    function nameHighlightStyle(value) {
+      const colors = nameHighlightColors(value);
+      return `--name-bg:${colors.bg};--name-ink:${colors.ink};--name-border:${colors.border}`;
+    }
+
+    function renderNameHighlight(value) {
+      const name = normalizeNameOption(value);
+      if (!name) return "-";
+      return `<span class="name-highlight" style="${nameHighlightStyle(name)}" title="${escapeAttribute(name)}">${escapeHtml(name)}</span>`;
+    }
+
     function rememberedAdminName() {
       return localStorage.getItem(adminNameMemoryKey) || "";
     }
@@ -2250,7 +2309,7 @@
         : values;
       const visible = matched.slice(0, 80);
       const buttons = visible.map((value) => `
-        <button class="name-choice" type="button" title="${escapeAttribute(value)}" data-pick-field="${field}" data-pick-name="${escapeAttribute(value)}">
+        <button class="name-choice name-highlight-choice" style="${nameHighlightStyle(value)}" type="button" title="${escapeAttribute(value)}" data-pick-field="${field}" data-pick-name="${escapeAttribute(value)}">
           ${escapeHtml(value)}
         </button>
       `).join("");
@@ -3525,7 +3584,7 @@
         const completed = completedStatusCount(item.statuses);
         const percent = item.total ? Math.round(completed * 100 / item.total) : 0;
         const scoreClass = percent >= 80 ? "kpi-good" : percent >= 50 ? "kpi-watch" : "kpi-risk";
-        return `<tr><td>${escapeHtml(name)}</td><td><strong>${item.total}</strong></td><td>${item.wo}</td><td>${item.appointment}</td>${statuses.map((status) => `<td>${item.statuses[status] || 0}</td>`).join("")}<td class="kpi-score ${scoreClass}">${percent}%</td></tr>`;
+        return `<tr><td>${renderNameHighlight(name)}</td><td><strong>${item.total}</strong></td><td>${item.wo}</td><td>${item.appointment}</td>${statuses.map((status) => `<td>${item.statuses[status] || 0}</td>`).join("")}<td class="kpi-score ${scoreClass}">${percent}%</td></tr>`;
       }).join("") : `<tr><td colspan="${statuses.length + 5}" class="empty">ยังไม่มีข้อมูล KPI</td></tr>`;
     }
 
@@ -3615,8 +3674,8 @@
               <button class="icon-btn delete" type="button" title="ลบ" data-delete="${escapeAttribute(record.id)}">×</button>
             </div>
           </td>
-          <td>${displayValue(record.adminName)}</td>
-          <td>${displayValue(record.salesName)}</td>
+          <td>${renderNameHighlight(record.adminName)}</td>
+          <td>${renderNameHighlight(record.salesName)}</td>
           <td>${displayValue(normalizePhone(record.salesmanContact))}</td>
           <td${duplicateCellAttrs(record, "hiNumber", duplicateLookup)}>${displayValue(record.hiNumber)}</td>
           <td${duplicateCellAttrs(record, "trueId", duplicateLookup)}>${displayValue(record.trueId)}</td>
@@ -3629,11 +3688,11 @@
           <td><span class="pill ${statusPillClass(record.salesOrg)}">${displayValue(record.salesOrg)}</span></td>
           <td><span class="pill ${statusPillClass(record.callVer)}">${displayValue(record.callVer)}</span></td>
           <td><span class="pill ${statusPillClass(record.operationStatus)}">${displayValue(statusText[record.operationStatus] || record.operationStatus)}</span></td>
-          <td>${displayValue(record.cell39)}</td>
+          <td>${renderNameHighlight(record.cell39)}</td>
           <td>${displayValue(record.subDistrict)}</td>
           <td>${displayValue(record.district)}</td>
           <td>${displayValue(record.province)}</td>
-          <td>${displayValue(record.subcontractorName)}</td>
+          <td>${renderNameHighlight(record.subcontractorName)}</td>
           <td>${displayValue(record.region)}</td>
           <td>${displayValue(record.ownArea)}</td>
           <td>${displayValue(record.workArea)}</td>
