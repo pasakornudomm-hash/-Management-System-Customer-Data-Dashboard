@@ -322,6 +322,46 @@
     .kpi-watch { color: var(--orange); }
     .kpi-risk { color: var(--red); }
 
+    .region-rate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin: 14px 0 18px;
+    }
+
+    .region-rate-card {
+      padding: 13px 14px;
+      border: 1px solid #d8e5f5;
+      border-left: 5px solid var(--region-color, var(--blue-600));
+      border-radius: 10px;
+      background: linear-gradient(135deg, #fff, #f7fbff);
+    }
+
+    .region-rate-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .region-rate-card strong {
+      display: block;
+      margin: 3px 0;
+      color: var(--blue-900);
+      font-size: 23px;
+      line-height: 1.15;
+    }
+
+    .region-rate-card small {
+      color: var(--blue-700);
+      font-weight: 700;
+    }
+
+    .region-rate-total {
+      background: #edf5ff;
+      font-weight: 900;
+    }
+
     .install-cards {
       display: grid;
       grid-template-columns: repeat(5, minmax(160px, 1fr));
@@ -1631,6 +1671,19 @@
             <div class="map-panel">
               <div id="regionMap"></div>
               <div class="map-list" id="regionMapList"></div>
+            </div>
+          </div>
+          <div class="panel dashboard-bottom-section" id="regionRunRateSection" style="grid-column: 1 / -1;">
+            <div class="section-title">
+              <h3>Run Rate งานเข้ารายวัน แยกตามภาค</h3>
+            </div>
+            <div class="table-hint">คำนวณจาก Wo Create Time และจัดภาค AUTO จากจังหวัด แสดงตามเดือนที่เลือก (ทุกเดือนจะแสดง 31 วันล่าสุดที่มีงาน)</div>
+            <div class="region-rate-grid" id="regionRunRateSummary"></div>
+            <div class="table-wrap">
+              <table class="analytics-table" id="regionRunRateTable">
+                <thead id="regionRunRateHead"></thead>
+                <tbody id="regionRunRateBody"></tbody>
+              </table>
             </div>
           </div>
           <div class="panel">
@@ -3101,7 +3154,8 @@
 
     function countByRegionAuto(sourceRecords = records) {
       return sourceRecords.reduce((acc, record) => {
-        const region = normalizeLocationValue(record.region, "region") || getRegionFromProvince(record.province) || "(ว่าง)";
+        const calculatedRegion = recordRegionName(record);
+        const region = calculatedRegion === "ไม่ระบุภาค" ? "(ว่าง)" : calculatedRegion;
         acc[region] = (acc[region] || 0) + 1;
         return acc;
       }, {});
@@ -3111,8 +3165,8 @@
       const value = normalizeLocationValue(province, "province");
       const regionMap = {
         "ภาคตะวันออก": ["ชลบุรี", "ระยอง", "จันทบุรี", "ตราด", "สระแก้ว", "ปราจีนบุรี", "ฉะเชิงเทรา"],
-        "ภาคกลาง": ["กรุงเทพมหานคร", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ", "สมุทรสาคร", "นครปฐม", "พระนครศรีอยุธยา", "สระบุรี", "ลพบุรี", "สิงห์บุรี", "ชัยนาท", "อ่างทอง"],
-        "ภาคเหนือ": ["เชียงใหม่", "เชียงราย", "ลำพูน", "ลำปาง", "แพร่", "น่าน", "พะเยา", "แม่ฮ่องสอน", "อุตรดิตถ์"],
+        "ภาคกลาง": ["กรุงเทพมหานคร", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ", "สมุทรสาคร", "สมุทรสงคราม", "นครปฐม", "นครนายก", "พระนครศรีอยุธยา", "สุพรรณบุรี", "สระบุรี", "ลพบุรี", "สิงห์บุรี", "ชัยนาท", "อ่างทอง"],
+        "ภาคเหนือ": ["เชียงใหม่", "เชียงราย", "ลำพูน", "ลำปาง", "แพร่", "น่าน", "พะเยา", "แม่ฮ่องสอน", "อุตรดิตถ์", "สุโขทัย", "พิษณุโลก", "พิจิตร", "กำแพงเพชร", "เพชรบูรณ์", "นครสวรรค์", "อุทัยธานี"],
         "ภาคตะวันออกเฉียงเหนือ": ["นครราชสีมา", "ขอนแก่น", "อุดรธานี", "อุบลราชธานี", "บุรีรัมย์", "สุรินทร์", "ศรีสะเกษ", "ร้อยเอ็ด", "มหาสารคาม", "กาฬสินธุ์", "สกลนคร", "นครพนม", "มุกดาหาร", "ชัยภูมิ", "เลย", "หนองคาย", "บึงกาฬ", "หนองบัวลำภู", "ยโสธร", "อำนาจเจริญ"],
         "ภาคตะวันตก": ["กาญจนบุรี", "ราชบุรี", "เพชรบุรี", "ประจวบคีรีขันธ์", "ตาก"],
         "ภาคใต้": ["ชุมพร", "ระนอง", "สุราษฎร์ธานี", "พังงา", "ภูเก็ต", "กระบี่", "นครศรีธรรมราช", "ตรัง", "พัทลุง", "สงขลา", "สตูล", "ปัตตานี", "ยะลา", "นราธิวาส"]
@@ -3588,6 +3642,61 @@
       }).join("") : `<tr><td colspan="${statuses.length + 5}" class="empty">ยังไม่มีข้อมูล KPI</td></tr>`;
     }
 
+    const runRateRegions = [
+      { name: "ภาคเหนือ", color: "#3b82f6" },
+      { name: "ภาคตะวันออกเฉียงเหนือ", color: "#d97706" },
+      { name: "ภาคกลาง", color: "#e11d48" },
+      { name: "ภาคตะวันออก", color: "#16a34a" },
+      { name: "ภาคตะวันตก", color: "#0891b2" },
+      { name: "ภาคใต้", color: "#7c3aed" },
+      { name: "ไม่ระบุภาค", color: "#64748b" }
+    ];
+
+    function recordRegionName(record) {
+      const provinceRegion = getRegionFromProvince(record.province);
+      if (provinceRegion) return provinceRegion;
+      const savedRegion = normalizeLocationValue(record.region, "region");
+      if (!savedRegion) return "ไม่ระบุภาค";
+      if (savedRegion.startsWith("ภาค")) return savedRegion;
+      const canonical = runRateRegions.find((region) => region.name === `ภาค${savedRegion}`);
+      return canonical ? canonical.name : savedRegion;
+    }
+
+    function buildRegionRunRate(sourceRecords = records) {
+      const days = new Map();
+      sourceRecords.forEach((record) => {
+        const key = dateKey(record.woCreateTime);
+        if (!key || !metricDateMatchesMonth(key)) return;
+        const region = recordRegionName(record);
+        if (!days.has(key)) days.set(key, Object.create(null));
+        days.get(key)[region] = (days.get(key)[region] || 0) + 1;
+      });
+      const sorted = [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      return reportMonth ? sorted : sorted.slice(-31);
+    }
+
+    function renderRegionRunRate(sourceRecords = records) {
+      const metrics = buildRegionRunRate(sourceRecords);
+      const regionNames = [...runRateRegions.map((item) => item.name), ...new Set(metrics.flatMap(([, counts]) => Object.keys(counts)))]
+        .filter((name, index, values) => values.indexOf(name) === index);
+      const totals = Object.fromEntries(regionNames.map((name) => [name, 0]));
+      metrics.forEach(([, counts]) => regionNames.forEach((name) => { totals[name] += Number(counts[name] || 0); }));
+      const dayCount = metrics.length;
+
+      $("#regionRunRateSummary").innerHTML = runRateRegions.map((region) => {
+        const total = totals[region.name] || 0;
+        const average = dayCount ? total / dayCount : 0;
+        const peak = metrics.reduce((max, [, counts]) => Math.max(max, Number(counts[region.name] || 0)), 0);
+        return `<div class="region-rate-card" style="--region-color:${region.color}"><span>${region.name}</span><strong>${average.toFixed(1)} งาน/วัน</strong><small>รวม ${total} งาน · สูงสุด ${peak} งาน/วัน</small></div>`;
+      }).join("");
+
+      $("#regionRunRateHead").innerHTML = `<tr><th>วันที่</th><th>วัน</th>${regionNames.map((name) => `<th>${escapeHtml(name)}</th>`).join("")}<th>รวมต่อวัน</th></tr>`;
+      $("#regionRunRateBody").innerHTML = metrics.length ? [...metrics].reverse().map(([key, counts]) => {
+        const total = regionNames.reduce((sum, name) => sum + Number(counts[name] || 0), 0);
+        return `<tr><td>${formatDateKey(key)}</td><td>${formatWeekday(key)}</td>${regionNames.map((name) => `<td>${counts[name] || 0}</td>`).join("")}<td class="region-rate-total">${total}</td></tr>`;
+      }).join("") : `<tr><td colspan="${regionNames.length + 3}" class="empty">ยังไม่มี Wo Create Time ในช่วงที่เลือก</td></tr>`;
+    }
+
     function matchesAreaTarget(record, target) {
       if (target.text) {
         return String(`${record.ownArea || ""} ${record.workArea || ""} ${record.notes || ""}`).includes(target.text);
@@ -3623,6 +3732,7 @@
       $("#pendingInstallCount").textContent = totalPending;
       renderDailyAnalytics(sourceRecords);
       renderSalesKpi(sourceRecords);
+      renderRegionRunRate(records);
 
       $("#installSummary").innerHTML = installTargets.map((target) => {
         const item = summary.installs[target.key] || { total: 0, completed: 0, pending: 0 };
