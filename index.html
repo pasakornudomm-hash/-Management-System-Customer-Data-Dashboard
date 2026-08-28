@@ -1541,6 +1541,14 @@
           </div>
         </div>
 
+        <div class="panel dashboard-bottom-section" id="completedAreaShareSection">
+          <div class="section-title">
+            <h3>% งาน Completed แยกตามพื้นที่ขาย</h3>
+          </div>
+          <div class="table-hint">นับเฉพาะ Operation Status ที่เป็น Completed ของพื้นที่นั้นโดยตรง · ชล1 ชล2 จันทบุรี และตราด แยกจากกันทุกกลุ่ม</div>
+          <div class="region-rate-grid" id="completedAreaShare"></div>
+        </div>
+
         <div class="analytics-grid dashboard-bottom-section" id="dailyAnalyticsSection">
           <div class="panel">
             <div class="section-title">
@@ -2010,6 +2018,12 @@
       { key: "rayong", label: "ระยอง", code: "10047541" },
       { key: "chanthaburi", label: "จันทบุรี", code: "10057880" },
       { key: "trat", label: "ตราด", code: "10057882" }
+    ];
+    const completedAreaTargets = [
+      { key: "chon1", label: "ชล1", status: "Completed10047649", color: "#1769d1" },
+      { key: "chon2", label: "ชล2", status: "Completed10051943", color: "#7c3aed" },
+      { key: "chanthaburi", label: "จันทบุรี", status: "Completed10057880", color: "#ea580c" },
+      { key: "trat", label: "ตราด", status: "Completed10057882", color: "#059669" }
     ];
     const areaTargets = [
       { key: "redCbr01", label: "พื้นที่ ไข่แดงCBR 01", text: "พื้นที่ ไข่แดงCBR 01" },
@@ -3642,6 +3656,21 @@
       }).join("") : `<tr><td colspan="${statuses.length + 5}" class="empty">ยังไม่มีข้อมูล KPI</td></tr>`;
     }
 
+    function renderCompletedAreaShare(sourceRecords = records) {
+      const counts = Object.fromEntries(completedAreaTargets.map((target) => [target.key, 0]));
+      sourceRecords.forEach((record) => {
+        const operationStatus = String(record.operationStatus || "").trim().toLocaleLowerCase("en-US");
+        const target = completedAreaTargets.find((item) => item.status.toLocaleLowerCase("en-US") === operationStatus);
+        if (target) counts[target.key] += 1;
+      });
+      const completedTotal = completedAreaTargets.reduce((sum, target) => sum + counts[target.key], 0);
+      $("#completedAreaShare").innerHTML = completedAreaTargets.map((target) => {
+        const count = counts[target.key];
+        const percent = completedTotal ? count * 100 / completedTotal : 0;
+        return `<div class="region-rate-card" style="--region-color:${target.color}"><span>${target.label}</span><strong>${percent.toFixed(1)}%</strong><small>${count} งาน Completed</small></div>`;
+      }).join("");
+    }
+
     const runRateRegions = [
       { name: "ภาคเหนือ", color: "#3b82f6" },
       { name: "ภาคตะวันออกเฉียงเหนือ", color: "#d97706" },
@@ -3732,6 +3761,7 @@
       $("#pendingInstallCount").textContent = totalPending;
       renderDailyAnalytics(sourceRecords);
       renderSalesKpi(sourceRecords);
+      renderCompletedAreaShare(sourceRecords);
       renderRegionRunRate(records);
 
       $("#installSummary").innerHTML = installTargets.map((target) => {
