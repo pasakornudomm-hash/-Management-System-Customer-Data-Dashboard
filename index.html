@@ -400,6 +400,24 @@
       white-space: nowrap;
     }
 
+    .completed-area-breakdown-row.province-region-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      border-left: 5px solid var(--province-region-color, #64748b);
+      background: var(--province-region-bg, #f1f5f9);
+    }
+
+    .province-region-row em {
+      padding: 3px 7px;
+      border: 1px solid var(--province-region-color, #64748b);
+      border-radius: 999px;
+      color: var(--province-region-color, #475569);
+      background: rgba(255, 255, 255, .76);
+      font-size: 10px;
+      font-style: normal;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
     .completed-area-empty {
       color: var(--muted);
       font-size: 12px;
@@ -3802,24 +3820,30 @@
           regionCounts[region] = (regionCounts[region] || 0) + 1;
           provinceCounts[province] = (provinceCounts[province] || 0) + 1;
         });
-        const breakdownRows = (items) => Object.entries(items)
+        const breakdownRows = (items, provinceMode = false) => Object.entries(items)
           .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
-          .map(([name, value]) => `<div class="completed-area-breakdown-row"><span title="${escapeAttribute(name)}">${escapeHtml(name)}</span><b>${count ? (value * 100 / count).toFixed(1) : "0.0"}% · ${value} งาน</b></div>`)
+          .map(([name, value]) => {
+            const percentage = count ? (value * 100 / count).toFixed(1) : "0.0";
+            if (!provinceMode) return `<div class="completed-area-breakdown-row"><span title="${escapeAttribute(name)}">${escapeHtml(name)}</span><b>${percentage}% · ${value} งาน</b></div>`;
+            const provinceRegion = getRegionFromProvince(name) || "ไม่ระบุภาค";
+            const regionStyle = runRateRegions.find((region) => region.name === provinceRegion) || runRateRegions[runRateRegions.length - 1];
+            return `<div class="completed-area-breakdown-row province-region-row" style="--province-region-color:${regionStyle.color};--province-region-bg:${regionStyle.bg}"><span title="${escapeAttribute(name)}">${escapeHtml(name)}</span><em>${escapeHtml(provinceRegion)}</em><b>${percentage}% · ${value} งาน</b></div>`;
+          })
           .join("");
         const provinceCount = Object.keys(provinceCounts).length;
-        const details = count ? `<div class="completed-area-breakdown"><h4>ภาคที่ขายจริง</h4>${breakdownRows(regionCounts)}<details class="completed-province-dropdown"><summary>จังหวัดที่ขายจริง (${provinceCount} จังหวัด)</summary><div class="completed-province-dropdown-list">${breakdownRows(provinceCounts)}</div></details></div>` : `<div class="completed-area-breakdown"><div class="completed-area-empty">ยังไม่มีงาน Completed ในกลุ่มนี้</div></div>`;
+        const details = count ? `<div class="completed-area-breakdown"><h4>ภาคที่ขายจริง</h4>${breakdownRows(regionCounts)}<details class="completed-province-dropdown"><summary>จังหวัดที่ขายจริง (${provinceCount} จังหวัด)</summary><div class="completed-province-dropdown-list">${breakdownRows(provinceCounts, true)}</div></details></div>` : `<div class="completed-area-breakdown"><div class="completed-area-empty">ยังไม่มีงาน Completed ในกลุ่มนี้</div></div>`;
         return `<div class="region-rate-card completed-area-card" style="--region-color:${target.color}"><span>${target.label}</span><strong>${percent.toFixed(1)}%</strong><small>${count} งาน Completed จาก 4 กลุ่ม</small>${details}</div>`;
       }).join("");
     }
 
     const runRateRegions = [
-      { name: "ภาคเหนือ", color: "#3b82f6" },
-      { name: "ภาคตะวันออกเฉียงเหนือ", color: "#d97706" },
-      { name: "ภาคกลาง", color: "#e11d48" },
-      { name: "ภาคตะวันออก", color: "#16a34a" },
-      { name: "ภาคตะวันตก", color: "#0891b2" },
-      { name: "ภาคใต้", color: "#7c3aed" },
-      { name: "ไม่ระบุภาค", color: "#64748b" }
+      { name: "ภาคเหนือ", color: "#2563eb", bg: "#dbeafe" },
+      { name: "ภาคตะวันออกเฉียงเหนือ", color: "#b45309", bg: "#fef3c7" },
+      { name: "ภาคกลาง", color: "#be123c", bg: "#ffe4e6" },
+      { name: "ภาคตะวันออก", color: "#15803d", bg: "#dcfce7" },
+      { name: "ภาคตะวันตก", color: "#0e7490", bg: "#cffafe" },
+      { name: "ภาคใต้", color: "#6d28d9", bg: "#ede9fe" },
+      { name: "ไม่ระบุภาค", color: "#475569", bg: "#f1f5f9" }
     ];
 
     function recordRegionName(record) {
