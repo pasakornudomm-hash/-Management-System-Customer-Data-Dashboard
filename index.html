@@ -357,6 +357,54 @@
       font-weight: 700;
     }
 
+    .completed-area-card {
+      min-width: 0;
+    }
+
+    .completed-area-breakdown {
+      display: grid;
+      gap: 7px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #dce7f6;
+    }
+
+    .completed-area-breakdown h4 {
+      margin: 2px 0 0;
+      color: var(--blue-900);
+      font-size: 12px;
+    }
+
+    .completed-area-breakdown-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 7px;
+      background: #f2f7fd;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .completed-area-breakdown-row span {
+      overflow: hidden;
+      color: var(--ink);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .completed-area-breakdown-row b {
+      color: var(--blue-800);
+      white-space: nowrap;
+    }
+
+    .completed-area-empty {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     .region-rate-total {
       background: #edf5ff;
       font-weight: 900;
@@ -1580,7 +1628,7 @@
           <div class="section-title">
             <h3>% งาน Completed แยกตามพื้นที่ขาย</h3>
           </div>
-          <div class="table-hint">นับเฉพาะ Operation Status ที่เป็น Completed ของพื้นที่นั้นโดยตรง · ชล1 ชล2 จันทบุรี และตราด แยกจากกันทุกกลุ่ม</div>
+          <div class="table-hint">นับเฉพาะ Operation Status ที่เป็น Completed ของพื้นที่นั้นโดยตรง · แต่ละกลุ่มแสดงภาคและจังหวัดที่ขายจริง พร้อมเปอร์เซ็นต์ภายในกลุ่ม</div>
           <div class="region-rate-grid" id="completedAreaShare"></div>
         </div>
 
@@ -3704,16 +3752,33 @@
 
     function renderCompletedAreaShare(sourceRecords = records) {
       const counts = Object.fromEntries(completedAreaTargets.map((target) => [target.key, 0]));
+      const groupedRecords = Object.fromEntries(completedAreaTargets.map((target) => [target.key, []]));
       sourceRecords.forEach((record) => {
         const operationStatus = String(record.operationStatus || "").trim().toLocaleLowerCase("en-US");
         const target = completedAreaTargets.find((item) => item.status.toLocaleLowerCase("en-US") === operationStatus);
-        if (target) counts[target.key] += 1;
+        if (target) {
+          counts[target.key] += 1;
+          groupedRecords[target.key].push(record);
+        }
       });
       const completedTotal = completedAreaTargets.reduce((sum, target) => sum + counts[target.key], 0);
       $("#completedAreaShare").innerHTML = completedAreaTargets.map((target) => {
         const count = counts[target.key];
         const percent = completedTotal ? count * 100 / completedTotal : 0;
-        return `<div class="region-rate-card" style="--region-color:${target.color}"><span>${target.label}</span><strong>${percent.toFixed(1)}%</strong><small>${count} งาน Completed</small></div>`;
+        const regionCounts = {};
+        const provinceCounts = {};
+        groupedRecords[target.key].forEach((record) => {
+          const region = recordRegionName(record);
+          const province = normalizeLocationValue(record.province, "province") || "ไม่ระบุจังหวัด";
+          regionCounts[region] = (regionCounts[region] || 0) + 1;
+          provinceCounts[province] = (provinceCounts[province] || 0) + 1;
+        });
+        const breakdownRows = (items) => Object.entries(items)
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
+          .map(([name, value]) => `<div class="completed-area-breakdown-row"><span title="${escapeAttribute(name)}">${escapeHtml(name)}</span><b>${count ? (value * 100 / count).toFixed(1) : "0.0"}% · ${value} งาน</b></div>`)
+          .join("");
+        const details = count ? `<div class="completed-area-breakdown"><h4>ภาคที่ขายจริง</h4>${breakdownRows(regionCounts)}<h4>จังหวัดที่ขายจริง</h4>${breakdownRows(provinceCounts)}</div>` : `<div class="completed-area-breakdown"><div class="completed-area-empty">ยังไม่มีงาน Completed ในกลุ่มนี้</div></div>`;
+        return `<div class="region-rate-card completed-area-card" style="--region-color:${target.color}"><span>${target.label}</span><strong>${percent.toFixed(1)}%</strong><small>${count} งาน Completed จาก 4 กลุ่ม</small>${details}</div>`;
       }).join("");
     }
 
