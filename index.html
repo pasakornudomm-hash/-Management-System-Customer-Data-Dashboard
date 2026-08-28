@@ -405,6 +405,35 @@
       font-size: 12px;
     }
 
+    .completed-province-dropdown {
+      margin-top: 3px;
+      border: 1px solid #d8e5f5;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .completed-province-dropdown summary {
+      padding: 8px 10px;
+      color: var(--blue-800);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      list-style-position: inside;
+    }
+
+    .completed-province-dropdown[open] summary {
+      border-bottom: 1px solid #dce7f6;
+      background: #f5f9ff;
+    }
+
+    .completed-province-dropdown-list {
+      display: grid;
+      gap: 6px;
+      max-height: 230px;
+      padding: 8px;
+      overflow-y: auto;
+    }
+
     .region-rate-total {
       background: #edf5ff;
       font-weight: 900;
@@ -3777,7 +3806,8 @@
           .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"))
           .map(([name, value]) => `<div class="completed-area-breakdown-row"><span title="${escapeAttribute(name)}">${escapeHtml(name)}</span><b>${count ? (value * 100 / count).toFixed(1) : "0.0"}% · ${value} งาน</b></div>`)
           .join("");
-        const details = count ? `<div class="completed-area-breakdown"><h4>ภาคที่ขายจริง</h4>${breakdownRows(regionCounts)}<h4>จังหวัดที่ขายจริง</h4>${breakdownRows(provinceCounts)}</div>` : `<div class="completed-area-breakdown"><div class="completed-area-empty">ยังไม่มีงาน Completed ในกลุ่มนี้</div></div>`;
+        const provinceCount = Object.keys(provinceCounts).length;
+        const details = count ? `<div class="completed-area-breakdown"><h4>ภาคที่ขายจริง</h4>${breakdownRows(regionCounts)}<details class="completed-province-dropdown"><summary>จังหวัดที่ขายจริง (${provinceCount} จังหวัด)</summary><div class="completed-province-dropdown-list">${breakdownRows(provinceCounts)}</div></details></div>` : `<div class="completed-area-breakdown"><div class="completed-area-empty">ยังไม่มีงาน Completed ในกลุ่มนี้</div></div>`;
         return `<div class="region-rate-card completed-area-card" style="--region-color:${target.color}"><span>${target.label}</span><strong>${percent.toFixed(1)}%</strong><small>${count} งาน Completed จาก 4 กลุ่ม</small>${details}</div>`;
       }).join("");
     }
