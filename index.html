@@ -997,6 +997,29 @@
       background: #e6fffb;
     }
 
+    .paired-code-select {
+      border-width: 2px;
+      font-weight: 800;
+    }
+
+    .paired-code-select.select-code-10047649 { border-color: #4ade80; color: #166534; background: #ecfdf3; }
+    .paired-code-select.select-code-10051943 { border-color: #60a5fa; color: #1e3a8a; background: #eff6ff; }
+    .paired-code-select.select-code-10057880 { border-color: #fb923c; color: #9a3412; background: #fff7ed; }
+    .paired-code-select.select-code-10057882 { border-color: #2dd4bf; color: #115e59; background: #f0fdfa; }
+
+    .paired-code-select option.code-option-10047649 { color: #166534; background: #dcfce7; }
+    .paired-code-select option.code-option-10051943 { color: #1e3a8a; background: #dbeafe; }
+    .paired-code-select option.code-option-10057880 { color: #9a3412; background: #ffedd5; }
+    .paired-code-select option.code-option-10057882 { color: #115e59; background: #ccfbf1; }
+
+    .org-status-match-note {
+      display: block;
+      margin-top: 5px;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
     .row-actions {
       display: flex;
       gap: 6px;
@@ -1917,12 +1940,12 @@
               <input id="promotion" placeholder="โปรโมชั่น">
             </label>
             <label>Sales Org
-              <select id="salesOrg" required>
+              <select id="salesOrg" class="paired-code-select" required>
                 <option value="">เลือก Sales Org</option>
-                <option>10047649</option>
-                <option>10051943</option>
-                <option>10057880</option>
-                <option>10057882</option>
+                <option class="code-option-10047649" value="10047649">10047649 — ชล1</option>
+                <option class="code-option-10051943" value="10051943">10051943 — ชล2</option>
+                <option class="code-option-10057880" value="10057880">10057880 — จันทบุรี</option>
+                <option class="code-option-10057882" value="10057882">10057882 — ตราด</option>
                 <option>Cancelled</option>
               </select>
               <small class="field-note auto-clear-note" id="salesOrgCancelledNote" hidden>เลือก Cancelled แล้ว ระบบจะล้างเซลล์ 39, ตำบล, อำเภอ, จังหวัด และ Sub-contrator name อัตโนมัติ</small>
@@ -1931,21 +1954,23 @@
               <select id="callVer" required>
                 <option value="">เลือก Call ver</option>
                 <option>Approve</option>
+                <option>Waiting</option>
                 <option>RETURN</option>
                 <option>Cancelled</option>
               </select>
             </label>
             <label>Operation status
-              <select id="operationStatus" required>
+              <select id="operationStatus" class="paired-code-select" required>
                 <option value="">เลือก Operation status</option>
-                <option>Completed10047649</option>
-                <option>Completed10051943</option>
-                <option>Completed10057880</option>
-                <option>Completed10057882</option>
+                <option class="code-option-10047649" value="Completed10047649">Completed10047649 — ชล1</option>
+                <option class="code-option-10051943" value="Completed10051943">Completed10051943 — ชล2</option>
+                <option class="code-option-10057880" value="Completed10057880">Completed10057880 — จันทบุรี</option>
+                <option class="code-option-10057882" value="Completed10057882">Completed10057882 — ตราด</option>
                 <option>Scheduled</option>
                 <option>Cancelled</option>
                 <option>Rejected</option>
               </select>
+              <small class="org-status-match-note" id="salesOrgStatusMatchNote" role="alert" hidden></small>
             </label>
             <label>เซลล์ 39
               <input id="cell39" list="cell39Options" placeholder="เว้นว่างได้ หรือพิมพ์ชื่อใหม่">
@@ -2010,6 +2035,7 @@
           <select id="callVerFilter">
             <option value="">ทุก Call ver</option>
             <option>Approve</option>
+            <option>Waiting</option>
             <option>RETURN</option>
             <option>Cancelled</option>
           </select>
@@ -2790,6 +2816,7 @@
       renderManagedNamePickers();
       checkDuplicateFields();
       syncCancelledSalesOrgFields();
+      syncSalesOrgOperationStatus();
       validateLocationFields();
     }
 
@@ -2893,6 +2920,8 @@
       renderManagedNamePickers();
       checkDuplicateFields();
       syncCancelledSalesOrgFields();
+      calculateAutoFields();
+      syncSalesOrgOperationStatus();
       validateLocationFields();
       switchView("form");
     }
@@ -3098,6 +3127,44 @@
       return "pending";
     }
 
+    const pairedSalesOrgCodes = {
+      "10047649": "ชล1",
+      "10051943": "ชล2",
+      "10057880": "จันทบุรี",
+      "10057882": "ตราด"
+    };
+
+    function codeFromOperationStatus(value) {
+      return String(value || "").trim().match(/^Completed(100\d+)$/i)?.[1] || "";
+    }
+
+    function syncPairedCodeSelectColor(select, code) {
+      if (!select) return;
+      Object.keys(pairedSalesOrgCodes).forEach((itemCode) => select.classList.remove(`select-code-${itemCode}`));
+      if (pairedSalesOrgCodes[code]) select.classList.add(`select-code-${code}`);
+    }
+
+    function syncSalesOrgOperationStatus() {
+      const salesOrgSelect = $("#salesOrg");
+      const operationStatusSelect = $("#operationStatus");
+      const note = $("#salesOrgStatusMatchNote");
+      const salesOrg = String(salesOrgSelect?.value || "").trim();
+      const operationCode = codeFromOperationStatus(operationStatusSelect?.value);
+      syncPairedCodeSelectColor(salesOrgSelect, salesOrg);
+      syncPairedCodeSelectColor(operationStatusSelect, operationCode);
+
+      const mismatch = Boolean(operationCode && salesOrg !== operationCode);
+      const message = mismatch
+        ? `รหัสไม่ตรงกัน: Sales Org ${salesOrg || "ยังไม่ได้เลือก"} แต่ Operation Status เป็น ${operationCode} (${pairedSalesOrgCodes[operationCode] || "ไม่ทราบพื้นที่"})`
+        : "";
+      operationStatusSelect?.setCustomValidity(message);
+      if (note) {
+        note.hidden = !mismatch;
+        note.textContent = mismatch ? `⚠️ ${message} กรุณาเลือกเลขสีเดียวกันก่อนบันทึก` : "";
+      }
+      return !mismatch;
+    }
+
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, (char) => ({
         "&": "&amp;",
@@ -3120,9 +3187,8 @@
       const woDate = $("#woCreateTime").value;
       const confirmedDate = $("#confirmedTime").value;
 
-      $("#region").value = /ชลบุรี|ระยอง|จันทบุรี|ตราด|สระแก้ว|ปราจีนบุรี|ฉะเชิงเทรา/.test(province)
-        ? "ภาคตะวันออก"
-        : "";
+      $("#region").value = getRegionFromProvince(province);
+      syncSalesOrgOperationStatus();
 
       let ownArea = "";
       if (/หนองปรือ/.test(subDistrict) && /บางละมุง/.test(district)) {
@@ -4316,6 +4382,10 @@
       document.getElementById(id).addEventListener("change", validateLocationFields);
     });
     $("#salesOrg").addEventListener("change", syncCancelledSalesOrgFields);
+    ["salesOrg", "operationStatus"].forEach((id) => {
+      document.getElementById(id).addEventListener("input", syncSalesOrgOperationStatus);
+      document.getElementById(id).addEventListener("change", syncSalesOrgOperationStatus);
+    });
     $("#cell39").addEventListener("blur", (event) => {
       event.target.value = canonicalizeCell39(event.target.value);
     });
@@ -4416,6 +4486,11 @@
     $("#recordForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (isSubmittingRecord || isMutatingSheet) return;
+      if (!syncSalesOrgOperationStatus()) {
+        $("#operationStatus").reportValidity();
+        setStatus("Sales Org และ Operation Status เป็นคนละรหัส กรุณาเลือกเลขสีเดียวกัน", true);
+        return;
+      }
       setRecordSubmitting(true);
       isMutatingSheet = true;
       const existingId = $("#recordId").value.trim();
@@ -4551,6 +4626,7 @@
     });
     renderCell39Options();
     syncCancelledSalesOrgFields();
+    syncSalesOrgOperationStatus();
     validateLocationFields();
     syncReportMonthInputs();
     renderAll();
