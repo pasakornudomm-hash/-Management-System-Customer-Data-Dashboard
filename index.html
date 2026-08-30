@@ -3,10 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef6ff" id="themeColorMeta">
   <title>ระบบจัดการข้อมูลลูกค้า</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    try {
+      const savedTheme = localStorage.getItem("mycenter-customer-theme-v1");
+      const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme;
+    } catch (error) {
+      document.documentElement.dataset.theme = "light";
+    }
+  </script>
   <style>
     :root {
       --blue-900: #0a2f66;
@@ -1534,6 +1544,104 @@
       text-align: center;
     }
 
+    .theme-toggle {
+      min-width: 132px;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --blue-900: #dbeafe;
+      --blue-800: #bfdbfe;
+      --blue-700: #93c5fd;
+      --blue-600: #60a5fa;
+      --blue-100: #1e293b;
+      --blue-050: #172033;
+      --ink: #e5edf8;
+      --muted: #9cabc0;
+      --line: #334155;
+      --shadow: 0 16px 38px rgba(0, 0, 0, .34);
+    }
+
+    html[data-theme="dark"] body {
+      background: linear-gradient(180deg, #07111f 0%, #0b1220 46%, #0f172a 100%);
+    }
+
+    html[data-theme="dark"] .sidebar {
+      background: linear-gradient(180deg, #061a36, #103a70);
+    }
+
+    html[data-theme="dark"] .panel,
+    html[data-theme="dark"] .stat,
+    html[data-theme="dark"] .install-card,
+    html[data-theme="dark"] .area-item,
+    html[data-theme="dark"] .map-list-item,
+    html[data-theme="dark"] .filter-menu,
+    html[data-theme="dark"] .name-library,
+    html[data-theme="dark"] .name-choice,
+    html[data-theme="dark"] .completed-province-dropdown,
+    html[data-theme="dark"] .province-rank-card {
+      background: #111827;
+    }
+
+    html[data-theme="dark"] input,
+    html[data-theme="dark"] select,
+    html[data-theme="dark"] textarea {
+      border-color: #475569;
+      color: #e5edf8;
+      background: #0f172a;
+    }
+
+    html[data-theme="dark"] input::placeholder,
+    html[data-theme="dark"] textarea::placeholder {
+      color: #718198;
+    }
+
+    html[data-theme="dark"] .primary-btn {
+      color: #fff;
+      background: #2563eb;
+    }
+
+    html[data-theme="dark"] .danger-btn {
+      color: #fca5a5;
+      background: #3f1d25;
+    }
+
+    html[data-theme="dark"] th {
+      color: #fff;
+      background: #173b6d;
+    }
+
+    html[data-theme="dark"] tbody tr:hover {
+      background: #172033;
+    }
+
+    html[data-theme="dark"] .candlestick-chart,
+    html[data-theme="dark"] .trend-chart,
+    html[data-theme="dark"] .completed-province-dropdown[open] summary {
+      background: #0b1220;
+    }
+
+    html[data-theme="dark"] .completed-area-breakdown-row:not(.province-region-row) {
+      background: #1e293b;
+    }
+
+    html[data-theme="dark"] .province-region-row span,
+    html[data-theme="dark"] .province-region-row b {
+      color: #14233b;
+    }
+
+    html[data-theme="dark"] .auto-clear-note {
+      color: #bae6fd;
+      background: #0c4a6e;
+      border-color: #0369a1;
+    }
+
+    html[data-theme="dark"] .location-validation-note {
+      color: #fed7aa;
+      background: #431407;
+      border-color: #c2410c;
+    }
+
     @media (max-width: 1280px) {
       .province-map-panel {
         grid-template-columns: 1fr;
@@ -1666,6 +1774,7 @@
           <p id="pageDescription">สรุปยอดติดตั้งเรียบร้อย รอติดตั้ง และพื้นที่จาก Google Sheet</p>
         </div>
         <div class="topbar-actions">
+          <button class="ghost-btn theme-toggle" type="button" id="themeToggleBtn" aria-pressed="false">🌙 โหมดมืด</button>
           <button class="ghost-btn" type="button" id="refreshDataBtn">รีเฟรชข้อมูล</button>
           <button class="primary-btn" type="button" id="newRecordBtn">+ เพิ่มรายการ</button>
         </div>
@@ -2148,6 +2257,7 @@
     const managedNamesKey = "blue-customer-records-managed-names-v1";
     const adminNameMemoryKey = "blue-customer-records-admin-name-v1";
     const reportMonthKey = "blue-customer-records-report-month-v1";
+    const themeStorageKey = "mycenter-customer-theme-v1";
     const gasModeLabel = "ใช้ Web App นี้เชื่อมต่ออัตโนมัติ";
     const CELL39_EXTRA_NAMES = [
       "น.ส.วิชชุดา แก้วมาลา",
@@ -2327,6 +2437,31 @@
     const createRequiredInputs = [...document.querySelectorAll("#recordForm [required]")];
 
     const $ = (selector) => document.querySelector(selector);
+
+    function applyTheme(theme, persist = true) {
+      const nextTheme = theme === "dark" ? "dark" : "light";
+      document.documentElement.dataset.theme = nextTheme;
+      const button = $("#themeToggleBtn");
+      if (button) {
+        const isDark = nextTheme === "dark";
+        button.textContent = isDark ? "☀️ โหมดสว่าง" : "🌙 โหมดมืด";
+        button.setAttribute("aria-pressed", String(isDark));
+        button.title = isDark ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด";
+      }
+      const themeMeta = $("#themeColorMeta");
+      if (themeMeta) themeMeta.content = nextTheme === "dark" ? "#07111f" : "#eef6ff";
+      if (persist) {
+        try {
+          localStorage.setItem(themeStorageKey, nextTheme);
+        } catch (error) {
+          console.warn("จำค่าโหมดสีไม่สำเร็จ", error);
+        }
+      }
+    }
+
+    function toggleTheme() {
+      applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    }
 
     function saveRecords() {
       if (cacheWriteHandle) return;
@@ -4263,6 +4398,7 @@
     });
     $("#exportBtn").addEventListener("click", exportCsv);
     $("#resetDashboardMonthBtn").addEventListener("click", () => setReportMonth(""));
+    $("#themeToggleBtn").addEventListener("click", toggleTheme);
     $("#settingsAccessBtn").addEventListener("click", unlockSettings);
     $("#lockSettingsBtn").addEventListener("click", () => {
       $("#settingsPanel").hidden = true;
@@ -4619,6 +4755,7 @@
     });
 
     $("#scriptUrl").value = isAppsScriptWebApp ? gasModeLabel : "โหมดตัวอย่างในเครื่อง";
+    applyTheme(document.documentElement.dataset.theme, false);
     $("#cancelEditBtn").style.display = "none";
     ["dailyDetailSection", "dailyAnalyticsSection", "salesKpiSection"].forEach((sectionId) => {
       const section = document.getElementById(sectionId);
